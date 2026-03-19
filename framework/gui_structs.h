@@ -9,6 +9,7 @@
 #include "gui_settings.h"
 #include "gui_cache.h"
 #include "gui_port.h"
+#include "mslist.h"
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
 #define IS_BUTTON_LONG_PRESS	(type == TYPE_BUTTON && action == LONG_PRESSED)

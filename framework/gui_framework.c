@@ -5,6 +5,7 @@
 #if WITHTOUCHGUI
 
 #include "gui_includes.h"
+#include "mslist.h"
 
 static gui_t gui = { 0, 0, CANCELLED, 0, 0, 0, 0, 0, };
 static LIST_ENTRY gui_objects_list;
