@@ -1,5 +1,5 @@
-#ifndef GUI_LIST_H_INCLUDED
-#define GUI_LIST_H_INCLUDED
+#ifndef LIST_H_INCLUDED
+#define LIST_H_INCLUDED
 
 #include <stddef.h>
 #include <stdint.h>
@@ -377,4 +377,4 @@ PushEntryList(
 
 
 
-#endif /* GUI_LIST_H_INCLUDED */
+#endif /* LIST_H_INCLUDED */
