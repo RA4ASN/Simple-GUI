@@ -62,6 +62,7 @@ void open_window(window_t * win)
 	win->state = VISIBLE;
 	win->first_call = 1;
 	win->is_moving = 0;
+	win->title_align = TITLE_ALIGNMENT_LEFT;
 	set_parent_window(win->window_id);
 
 #if GUI_USE_CACHE
@@ -439,8 +440,6 @@ void calculate_window_position(uint8_t mode, ...)
 		win->draw_x2 = win->x1 + win->w - edge_step;
 		win->draw_y2 = win->y1 + win->h - edge_step;
 	}
-
-	win->title_align = TITLE_ALIGNMENT_LEFT;
 
 	if (win->is_moving)
 	{
