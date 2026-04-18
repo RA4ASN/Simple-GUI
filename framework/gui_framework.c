@@ -643,8 +643,6 @@ void gui_initialize (void)
 	gui_objects_init();
 
 	open_window(get_win(WINDOW_MAIN));
-
-	gui_user_init();
 }
 
 /* Обновление данных в списке элементов открытых окон */
