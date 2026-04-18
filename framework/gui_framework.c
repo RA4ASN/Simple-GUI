@@ -643,6 +643,8 @@ void gui_initialize (void)
 	gui_objects_init();
 
 	open_window(get_win(WINDOW_MAIN));
+
+	gui_user_init();
 }
 
 /* Обновление данных в списке элементов открытых окон */
@@ -1004,11 +1006,13 @@ void process_gui(void)
 
 		if (win->state == VISIBLE)
 		{
-			win->onVisibleProcess();	// запуск процедуры фоновой обработки для окна
-
-			if (! win->first_call)
+			if (win->first_call)
+				win->onVisibleProcess();					// запуск только процедуры инициализации окна
+			else
 			{
 				draw_window(win);
+
+				win->onVisibleProcess();					// запуск процедуры фоновой обработки для окна
 
 				// отрисовка принадлежащих окну элементов
 				PLIST_ENTRY current_entry = gui_objects_list.Flink;
