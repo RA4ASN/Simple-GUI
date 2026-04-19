@@ -1,7 +1,7 @@
 #ifndef GUI_SYSTEM_H_INCLUDED
 #define GUI_SYSTEM_H_INCLUDED
 
-#include "gui_port_include.h"
+#include "gui_user_include.h"
 
 #if WITHTOUCHGUI
 #if ! GUI_EXTERNAL_FONTS
@@ -31,7 +31,6 @@ void gui_drawrect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, gui_color_
 void gui_drawrect_rounded(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t radius, gui_color_t color, uint8_t fill);
 void gui_drawrect_transparent(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t alpha);
 void gui_drawDashedRectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t dashLength, gui_color_t color);
-const gui_drawbuf_t * gui_get_drawbuf(void);
 
 void process_gui(void);
 

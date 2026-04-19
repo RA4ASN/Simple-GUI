@@ -1,11 +1,11 @@
 #ifndef EMBEDDED_FONTS_H_INCLUDED
 #define EMBEDDED_FONTS_H_INCLUDED
 
-#include "gui_port_include.h"
+#include "gui_user_include.h"
 
 #if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
 
-#include "gui_port.h"
+#include "../gui_sdl2_api.h"
 
 // моноширинные шрифты
 typedef struct g_UB_Font32_t {
@@ -25,8 +25,8 @@ typedef struct g_UB_pFont32_t {
 typedef g_UB_Font32		gui_mono_font_t;
 typedef g_UB_pFont32	gui_prop_font_t;
 
-void __gui_print_mono(const gui_drawbuf_t * gdb, uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
-void __gui_print_prop(const gui_drawbuf_t * gdb, uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
+void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
+void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
 
 void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
 void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);

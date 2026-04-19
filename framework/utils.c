@@ -106,3 +106,24 @@ int snormalize(int raw, int rawmin, int rawmax, int range)
 	}
 	return 0;
 }
+
+// 10 ms non-blocking delay
+uint8_t lp_delay_10ms(uint8_t init) {
+	static uint64_t oldt = 0;
+	struct timespec ts;
+	uint64_t t;
+	if (clock_gettime(CLOCK_MONOTONIC, &ts) == -1) {
+		return 0;
+	}
+	t = (uint64_t) ts.tv_sec * 1000ULL + (uint64_t) ts.tv_nsec / 1000000ULL;
+	if (init) {
+		oldt = t;
+		return 0;
+	} else {
+		if (t - oldt > 10) {
+			oldt = t;
+			return 1;
+		}
+		return 0;
+	}
+}

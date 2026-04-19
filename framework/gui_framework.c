@@ -1,6 +1,6 @@
 // Simple GUI от RA4ASN
 
-#include "gui_port_include.h"
+#include "gui_user_include.h"
 
 #if WITHTOUCHGUI
 
@@ -12,7 +12,6 @@ static LIST_ENTRY gui_objects_list;
 static uint8_t gui_object_count = 0;
 static button_t close_button = { 0, 0, CANCELLED, BUTTON_NON_LOCKED, 0, 0, 0, NO_PARENT_WINDOW, NON_VISIBLE, INT32_MAX, "btс_close", "", };
 static uint8_t opened_windows_count = 1;
-gui_drawbuf_t * drawbuf = NULL;
 
 /* Возврат id parent window */
 uint8_t get_parent_window(void)
@@ -338,11 +337,6 @@ not_found:
 		return find_gui_obj(type, get_win(WINDOW_MAIN), name);
 }
 
-const gui_drawbuf_t * gui_get_drawbuf(void)
-{
-	return __gui_get_drawbuf();
-}
-
 static uint8_t remove_from_gui_list(void * link)
 {
 	PLIST_ENTRY current_entry = gui_objects_list.Flink;
@@ -537,9 +531,6 @@ void objects_state (window_t * win)
 			close_button.parent = win->window_id;
 			close_button.visible = VISIBLE;
 			close_button.state = CANCELLED;
-#if GUI_USE_CACHE
-			close_button.cache = NULL;
-#endif /* GUI_USE_CACHE */
 
 			gui_object_t * new_obj = (gui_object_t *) calloc(1, sizeof(gui_object_t));
 			GUI_MEM_ASSERT(new_obj);
@@ -554,14 +545,6 @@ void objects_state (window_t * win)
 		}
 		else
 		{
-#if GUI_USE_CACHE
-            if (close_button.cache != NULL)
-            {
-                gui_objects_cache_destroy(close_button.cache);
-                close_button.cache = NULL;
-            }
-#endif /* GUI_USE_CACHE */
-
 			GUI_VERIFY(remove_from_gui_list(& close_button));
 			debug_num --;
 			gui_object_count--;
@@ -736,9 +719,6 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			button_t * bh = (button_t *) val->link;
 			bh->state = val->state;
-#if GUI_USE_CACHE
-			gui_objects_cache_invalidate(bh->cache);
-#endif /* GUI_USE_CACHE */
 			if (bh->state == RELEASED) close_all_windows();
 		}
 			break;
@@ -748,9 +728,6 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			button_t * bh = (button_t *) val->link;
 			bh->state = val->state;
-#if GUI_USE_CACHE
-			gui_objects_cache_invalidate(bh->cache);
-#endif /* GUI_USE_CACHE */
 			if (bh->state == RELEASED || bh->state == LONG_PRESSED || bh->state == PRESS_REPEATING)
 			{
 				if (! put_to_wm_queue(val->win, WM_MESSAGE_ACTION, TYPE_BUTTON, bh->state == LONG_PRESSED ? LONG_PRESSED : PRESSED, bh->name))
@@ -764,9 +741,6 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			label_t * lh = (label_t *) val->link;
 			lh->state = val->state;
-#if GUI_USE_CACHE
-			gui_objects_cache_invalidate(lh->cache);
-#endif /* GUI_USE_CACHE */
 			if (lh->state == RELEASED)
 			{
 				if (! put_to_wm_queue(val->win, WM_MESSAGE_ACTION, TYPE_LABEL, PRESSED, lh->name))
@@ -791,9 +765,6 @@ static void set_state_record(gui_object_t * val)
 				if (! put_to_wm_queue(val->win, WM_MESSAGE_ACTION, TYPE_SLIDER, PRESSED, sh->name))
 					dump_queue(val->win);
 			}
-#if GUI_USE_CACHE
-			gui_objects_cache_invalidate(sh->cache);
-#endif /* GUI_USE_CACHE */
 		}
 			break;
 

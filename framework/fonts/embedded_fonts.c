@@ -5,7 +5,7 @@
 // Web      : www.mikrocontroller-4u.de
 //--------------------------------------------------------------
 
-#include "gui_port_include.h"
+#include "gui_user_include.h"
 
 #if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
 
@@ -14,14 +14,14 @@
 #include "../gui_settings.h"
 #include "../gui_windows.h"
 #include "embedded_fonts.h"
-#include "gui_port.h"
+#include "../gui_sdl2_api.h"
 
 //--------------------------------------------------------------
 // Рисует ASCII символ шрифтом одного размера на позиции х, у.
 // Цвет шрифта и фон (шрифт = макс 32 пикселя в ширину)
 // Шрифт должен быть передан с оператором &
 //--------------------------------------------------------------
-static void UB_Font_DrawChar32(const void * db, uint16_t x, uint16_t y, uint8_t ascii, const gui_mono_font_t * font, uint32_t vg)
+static void UB_Font_DrawChar32(uint16_t x, uint16_t y, uint8_t ascii, const gui_mono_font_t * font, uint32_t vg)
 {
 	uint16_t xn, yn;
 	uint32_t start_maske, maske;
@@ -41,8 +41,7 @@ static void UB_Font_DrawChar32(const void * db, uint16_t x, uint16_t y, uint8_t 
 
 		for (xn = 0; xn < font->width; xn ++)
 		{
-			if ((wert[yn] & maske)) __gui_draw_point((gui_drawbuf_t *) db, x + xn, yn + y, (gui_color_t) vg);
-
+			if ((wert[yn] & maske)) __gui_draw_point(x + xn, yn + y, vg);
 			maske = (maske >> 1);
 		}
 	}
@@ -53,13 +52,13 @@ static void UB_Font_DrawChar32(const void * db, uint16_t x, uint16_t y, uint8_t 
 // Цвет шрифта и фон (шрифт = макс 32 пикселя в ширину)
 // Шрифт должен быть передан с оператором &
 //--------------------------------------------------------------
-static void gui_UB_Font_DrawString32(const void * db, uint16_t x, uint16_t y, const char * ptr, const gui_mono_font_t * font, uint32_t vg)
+static void gui_UB_Font_DrawString32(uint16_t x, uint16_t y, const char * ptr, const gui_mono_font_t * font, uint32_t vg)
 {
 	uint16_t pos;
 
 	pos = x;
 	while (* ptr != '\0') {
-		UB_Font_DrawChar32(db, pos, y, * ptr, font, vg);
+		UB_Font_DrawChar32(pos, y, * ptr, font, vg);
 		pos += font->width;
 		ptr ++;
 	}
@@ -71,7 +70,7 @@ static void gui_UB_Font_DrawString32(const void * db, uint16_t x, uint16_t y, co
 // Шрифт должен быть передан с оператором &
 // Возвращает: ширину нарисованного символа
 //--------------------------------------------------------------
-static uint16_t UB_Font_DrawPChar32(const void * db, uint16_t x, uint16_t y, uint8_t ascii, const gui_prop_font_t * font, gui_color_t vg)
+static uint16_t UB_Font_DrawPChar32(uint16_t x, uint16_t y, uint8_t ascii, const gui_prop_font_t * font, gui_color_t vg)
 {
 	uint16_t xn, yn, width;
 	uint_fast32_t start_maske, maske;
@@ -97,7 +96,7 @@ static uint16_t UB_Font_DrawPChar32(const void * db, uint16_t x, uint16_t y, uin
 
 		for (xn = 0; xn < width; xn++)
 		{
-			if ((wert[yn + 1] & maske)) __gui_draw_point((gui_drawbuf_t *) db, x + xn, yn + y, (gui_color_t) vg);
+			if ((wert[yn + 1] & maske)) __gui_draw_point(x + xn, yn + y, vg);
 
 			maske = (maske >> 1);
 		}
@@ -111,13 +110,13 @@ static uint16_t UB_Font_DrawPChar32(const void * db, uint16_t x, uint16_t y, uin
 // Цвет шрифта плана и фона (шрифт = макс 32 пикселя в ширину)
 // Шрифт должен быть передан с оператором &
 //--------------------------------------------------------------
-static void gui_UB_Font_DrawPString32(const void * db, uint16_t x, uint16_t y, const char * ptr, const gui_prop_font_t * font, uint32_t vg)
+static void gui_UB_Font_DrawPString32(uint16_t x, uint16_t y, const char * ptr, const gui_prop_font_t * font, uint32_t vg)
 {
 	uint16_t pos = x, width;
 
 	while (* ptr != 0)
 	{
-		width = UB_Font_DrawPChar32(db, pos, y, * ptr, font, vg);
+		width = UB_Font_DrawPChar32(pos, y, * ptr, font, vg);
 		pos += width;
 		ptr ++;
 	}
@@ -173,36 +172,33 @@ uint16_t get_strheight_prop(const gui_prop_font_t * font)
 	return font->height;
 }
 
-void __gui_print_mono(const gui_drawbuf_t * gdb, uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color)
+void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color)
 {
-	gui_UB_Font_DrawString32(gdb, x, y,	text, font, color);
+	gui_UB_Font_DrawString32(x, y,	text, font, color);
 }
 
-void __gui_print_prop(const gui_drawbuf_t * gdb, uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color)
+void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color)
 {
-	gui_UB_Font_DrawPString32(gdb, x, y, text, font, color);
+	gui_UB_Font_DrawPString32(x, y, text, font, color);
 }
 
 void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color)
 {
 	window_t * win = get_win(get_current_drawing_window());
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
-
 	const uint16_t xn = x + win->draw_x1;
 	const uint16_t yn = y + win->draw_y1;
 
-	gui_UB_Font_DrawString32(gdb, xn, yn,	text, font, color);
+	gui_UB_Font_DrawString32(xn, yn, text, font, color);
 }
 
 void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color)
 {
 	window_t * win = get_win(get_current_drawing_window());
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
 
 	const uint16_t xn = x + win->draw_x1;
 	const uint16_t yn = y + win->draw_y1;
 
-	gui_UB_Font_DrawPString32(gdb, xn, yn,	text, font, color);
+	gui_UB_Font_DrawPString32(xn, yn, text, font, color);
 }
 
 #endif /* WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS */

@@ -31,7 +31,7 @@
 //--------------------------------------------------------------
 // Includes
 //--------------------------------------------------------------
-#include "gui_port_include.h"
+#include "gui_user_include.h"
 
 #if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
 

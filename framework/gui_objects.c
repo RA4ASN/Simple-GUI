@@ -1,6 +1,6 @@
 // Simple GUI от RA4ASN
 
-#include "gui_port_include.h"
+#include "gui_user_include.h"
 
 #if WITHTOUCHGUI
 
@@ -57,68 +57,18 @@ uint16_t get_label_height2(const char * name)
 	return lh->height_pix;
 }
 
-static void __draw_label(label_t * lh, uint16_t x, uint16_t y, const gui_drawbuf_t * db)
+static void __draw_label(label_t * lh, uint16_t x, uint16_t y)
 {
-	__gui_print_mono(db, x, y, lh->text, lh->font, lh->color);
+	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
 }
 
 void draw_label(label_t * lh)
 {
 	window_t * win = get_win(lh->parent);
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
 	uint16_t x = win->x1 + lh->x;
 	uint16_t y = win->y1 + lh->y;
 
-#if GUI_USE_CACHE
-#if DEBUG_LABELS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (lh->cache != NULL && ! gui_objects_cache_needs_render(lh->cache, 0, 0, lh->text))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("Labels cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_LABELS_CACHE */
-
-	if (lh->cache != NULL && ! gui_objects_cache_needs_render(lh->cache, 0, 0, lh->text))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(lh->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (lh->cache == NULL)
-	{
-		lh->cache = gui_objects_cache_create(lh->width_pix, lh->height_pix, GUI_CACHE_TYPE_LABEL);
-		if (lh->cache == NULL) goto fallback_render;
-	}
-
-	/* Рендерим в кэш */
-	if (gui_objects_cache_begin_render(lh->cache))
-	{
-		const gui_drawbuf_t * cache_db = __gui_get_drawbuf();
-
-		__draw_label(lh, 0, 0, cache_db);
-
-		gui_objects_cache_end_render(lh->cache, 0, 0, lh->text);
-	}
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(lh->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* GUI_USE_CACHE */
-
-	__draw_label(lh, x, y, gdb);
+	__draw_label(lh, x, y);
 }
 
 // *************** Buttons ****************
@@ -128,26 +78,24 @@ static void fill_button_bg_buf(btn_bg_t * v)
 	const uint16_t w = v->w;
 	const uint16_t h = v->h;
 
-	for (int i = 0; i < BG_COUNT; i ++)
-	{
-		v->bgs[i] = __gui_object_bgbuf_init(w, h);
-
-		gui_drawbuf_t butdbv;
-		__gui_drawbuf_init(& butdbv, v->bgs[i], w, h);
-		__gui_draw_rounded_rect(& butdbv, 0, 0, w - 1, h - 1, button_round_radius, GUI_COLOR_GRAY, 0);
-		__gui_draw_rounded_rect(& butdbv, 1, 1, w - 3, h - 3, button_round_radius, GUI_COLOR_BLACK, 0);
-		__gui_draw_rounded_rect(& butdbv, 2, 2, w - 5, h - 5, button_round_radius, btn_bg_colors[i], 1);
-		__gui_drawbuf_end(& butdbv);
-	}
+//	for (int i = 0; i < BG_COUNT; i ++)
+//	{
+//		v->bgs[i] = __gui_object_bgbuf_init(w, h);
+//
+//		gui_drawbuf_t butdbv;
+//		__gui_drawbuf_init(& butdbv, v->bgs[i], w, h);
+//		// рисование
+//		__gui_drawbuf_end(& butdbv);
+//	}
 }
 
-static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawbuf_t * db)
+static void __draw_button(button_t * bh, uint16_t x, uint16_t y)
 {
 	window_t * win = get_win(bh->parent);
 
 	/* Поиск кэшированного фона по размерам */
 	btn_bg_t * b1 = NULL;
-#if ! GUI_USE_CACHE
+#if 0 // ************************************
 	uint8_t i = 0;
 	do {
 		if (bh->h == btn_bg[i].h && bh->w == btn_bg[i].w)
@@ -156,7 +104,7 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawb
 			break;
 		}
 	} while (++i < BG_DEF_COUNT);
-#endif /* ! GUI_USE_CACHE */
+#endif /*  */
 
 	if (b1 == NULL)
 	{
@@ -165,29 +113,30 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawb
 		c1 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED : (bh->is_locked ? GUI_COLOR_BUTTON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED);
 		c2 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED : (bh->is_locked ? GUI_COLOR_BUTTON_PR_LOCKED : GUI_COLOR_BUTTON_PR_NON_LOCKED);
 
-		__gui_draw_rect(db, x, y, bh->w - 1, bh->h - 1, GUI_DEFAULTCOLOR, 1);
-		__gui_draw_rounded_rect(db, x, y, bh->w - 1, bh->h - 1, button_round_radius, GUI_COLOR_GRAY, 0);
-		__gui_draw_rounded_rect(db, x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius, GUI_COLOR_BLACK, 0);
-		__gui_draw_rounded_rect(db, x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius, bh->state == PRESSED ? c2 : c1, 1);
-	} else
-	{
-		/* Копирование кэшированного фона */
-		gui_objbgbuf_t * bg = NULL;
-
-		if (bh->state == DISABLED) bg = b1->bgs[BG_DISABLED];
-		else if (bh->is_locked && bh->state == PRESSED) bg = b1->bgs[BG_LOCKED_PRESED];
-		else if (bh->is_locked && bh->state != PRESSED) bg = b1->bgs[BG_LOCKED];
-		else if (!bh->is_locked && bh->state == PRESSED) bg = b1->bgs[BG_PRESSED];
-		else if (!bh->is_locked && bh->state != PRESSED) bg = b1->bgs[BG_NON_PRESSED];
-
-		if (bg != NULL)
-		{
-			gui_drawbuf_t bgv;
-			__gui_drawbuf_init(& bgv, bg, bh->w, bh->h);
-			__gui_drawbuf_copy(db, & bgv, x, y, bh->w, bh->h);
-			__gui_drawbuf_end(& bgv);
-		}
+		__gui_draw_rect(x, y, bh->w - 1, bh->h - 1, GUI_DEFAULTCOLOR, 1);
+		__gui_draw_rounded_rect(x, y, bh->w - 1, bh->h - 1, button_round_radius, GUI_COLOR_GRAY, 0);
+		__gui_draw_rounded_rect(x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius, GUI_COLOR_BLACK, 0);
+		__gui_draw_rounded_rect(x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius, bh->state == PRESSED ? c2 : c1, 1);
 	}
+//	else
+//	{
+//		/* Копирование кэшированного фона */
+//		gui_objbgbuf_t * bg = NULL;
+//
+//		if (bh->state == DISABLED) bg = b1->bgs[BG_DISABLED];
+//		else if (bh->is_locked && bh->state == PRESSED) bg = b1->bgs[BG_LOCKED_PRESED];
+//		else if (bh->is_locked && bh->state != PRESSED) bg = b1->bgs[BG_LOCKED];
+//		else if (!bh->is_locked && bh->state == PRESSED) bg = b1->bgs[BG_PRESSED];
+//		else if (!bh->is_locked && bh->state != PRESSED) bg = b1->bgs[BG_NON_PRESSED];
+//
+//		if (bg != NULL)
+//		{
+//			gui_drawbuf_t bgv;
+//			__gui_drawbuf_init(& bgv, bg, bh->w, bh->h);
+//			__gui_drawbuf_copy(db, & bgv, x, y, bh->w, bh->h);
+//			__gui_drawbuf_end(& bgv);
+//		}
+//	}
 
 	/* Отрисовка текста кнопки */
 	const uint16_t shiftX = bh->state == PRESSED ? 1 : 0;
@@ -199,7 +148,7 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawb
 	{
 		/* Однострочная надпись */
 		int strlenP = get_strwidth_prop(bh->text, bh->font);
-		__gui_print_prop(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - bh->font->height) / 2,
+		__gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - bh->font->height) / 2,
 				bh->text, bh->font, textcolor);
 	} else
 	{
@@ -211,11 +160,11 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawb
 		char * text2 = strtok_r(buf, delimeters, & next);
 
 		int strlenP = get_strwidth_prop(text2, bh->font);
-		__gui_print_prop(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor);
+		__gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor);
 
 		text2 = strtok_r(NULL, delimeters, & next);
 		strlenP = get_strwidth_prop(text2, bh->font);
-		__gui_print_prop(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - bh->font->height - j,
+		__gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - bh->font->height - j,
 				text2, bh->font, textcolor);
 	}
 
@@ -226,112 +175,29 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawb
 void draw_button(button_t * bh)
 {
 	window_t * win = get_win(bh->parent);
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
 	uint16_t x1 = win->x1 + bh->x1;
 	uint16_t y1 = win->y1 + bh->y1;
 
-#if GUI_USE_CACHE
-#if DEBUG_BUTTONS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("Buttons cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_BUTTONS_CACHE */
-
-	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(bh->cache, x1, y1)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (bh->cache == NULL)
-	{
-		bh->cache = gui_objects_cache_create(bh->w, bh->h, GUI_CACHE_TYPE_BUTTON);
-		if (bh->cache == NULL) goto fallback_render;
-	}
-
-	/* Рендерим в кэш */
-	if (gui_objects_cache_begin_render(bh->cache))
-	{
-		const gui_drawbuf_t * cache_db = __gui_get_drawbuf();
-
-		__draw_button(bh, 0, 0, cache_db);
-
-		gui_objects_cache_end_render(bh->cache, bh->state, bh->is_locked, bh->text);
-	}
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(bh->cache, x1, y1)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* defined(GUI_USE_CACHE) */
-
-	__draw_button(bh, x1, y1, gdb);
+	__draw_button(bh, x1, y1);
 }
 
-static void __draw_close_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawbuf_t * db)
+static void __draw_close_button(button_t * bh, uint16_t x, uint16_t y)
 {
 	uint16_t w = bh->w;
 	uint16_t h = bh->h;
 
-	__gui_draw_rect(db, x, y, w,  h, GUI_COLOR_BLACK, 0);
-	__gui_draw_line(db, x, y, x + w, y + h, GUI_COLOR_BLACK);
-	__gui_draw_line(db, x, y + h, x + w, y, GUI_COLOR_BLACK);
+	__gui_draw_rect(x, y, w,  h, GUI_COLOR_BLACK, 0);
+	__gui_draw_line(x, y, x + w, y + h, GUI_COLOR_BLACK);
+	__gui_draw_line(x, y + h, x + w, y, GUI_COLOR_BLACK);
 }
 
 void draw_close_button(button_t * bh)
 {
 	window_t * win = get_win(bh->parent);
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
 	uint16_t x = win->x1 + bh->x1;
 	uint16_t y = win->y1 + bh->y1;
 
-#if GUI_USE_CACHE
-	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(bh->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (bh->cache == NULL)
-	{
-		bh->cache = gui_objects_cache_create(bh->w, bh->h, GUI_CACHE_TYPE_BUTTON);
-		if (bh->cache == NULL) goto fallback_render;
-	}
-
-	/* Рендерим в кэш */
-	if (gui_objects_cache_begin_render(bh->cache))
-	{
-		const gui_drawbuf_t * cache_db = __gui_get_drawbuf();
-
-		__draw_close_button(bh, 0, 0, cache_db);
-
-		gui_objects_cache_end_render(bh->cache, bh->state, bh->is_locked, bh->text);
-	}
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(bh->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* GUI_USE_CACHE */
-
-	__draw_close_button(bh, x, y, gdb);
+	__draw_close_button(bh, x, y);
 }
 
 // *************** Text fields ***************
@@ -383,7 +249,7 @@ void textfield_clean(const char * name)
 	memset(tf->string, 0, tf->h_str * sizeof(tf_entry_t));
 }
 
-static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, const gui_drawbuf_t * db)
+static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y)
 {
 	int_fast8_t j = tf->index - 1;
 
@@ -392,7 +258,7 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, const gu
 		uint8_t pos = tf->direction ? i : (tf->h_str - i - 1);
 		j = j < 0 ? (tf->h_str - 1) : j;
 
-		__gui_print_mono(drawbuf, x, y + tf->font->height * pos,
+		__gui_print_mono(x, y + tf->font->height * pos,
 				tf->string[j].text, tf->font, tf->string[j].color_line);
 
 		j --;
@@ -402,61 +268,10 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, const gu
 void draw_textfield(text_field_t * tf)
 {
 	window_t * win = get_win(tf->parent);
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
 	uint16_t x = win->x1 + tf->x1;
 	uint16_t y = win->y1 + tf->y1;
 
-#if GUI_USE_CACHE
-#if DEBUG_TFS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (tf->cache != NULL && ! gui_objects_cache_needs_render(tf->cache, 0, tf->cache->flags, ""))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("TFs cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_TFS_CACHE */
-
-	if (tf->cache != NULL && ! gui_objects_cache_needs_render(tf->cache, 0, tf->cache->flags, ""))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(tf->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (tf->cache == NULL)
-	{
-		tf->cache = gui_objects_cache_create(tf->w, tf->h, GUI_CACHE_TYPE_TF);
-		if (tf->cache == NULL) goto fallback_render;
-		tf->cache->flags = 0;
-	}
-
-	/* Рендерим в кэш */
-	if (gui_objects_cache_begin_render(tf->cache))
-	{
-		const gui_drawbuf_t * cache_db = __gui_get_drawbuf();
-
-		__draw_textfield(tf, 0, 0, cache_db);
-
-		gui_objects_cache_end_render(tf->cache, 0, tf->cache->flags, "");
-	}
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(tf->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* GUI_USE_CACHE */
-
-__draw_textfield(tf, x, y, gdb);
+	__draw_textfield(tf, x, y);
 }
 
 // *************** Sliders ****************
@@ -481,33 +296,33 @@ static void slider_update(slider_t * sl, uint16_t x, uint16_t y)
 	}
 }
 
-static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, const gui_drawbuf_t * db)
+static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y)
 {
 	if (sl->orientation == ORIENTATION_HORIZONTAL)
 	{
 		// temp background
-		//__gui_draw_rect(db, x, y,  sl->size, sliders_h * 2, COLORPIP_YELLOW, 1);
+		//__gui_draw_rect(x, y,  sl->size, sliders_h * 2, COLORPIP_YELLOW, 1);
 
 		// scale
-		__gui_draw_rect(db, x + sl->scale_x, y + sl->scale_y, sl->scale_size, sliders_scale_thickness, GUI_COLOR_WHITE, 0);
-		__gui_draw_rect(db, x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, sliders_scale_thickness - 2, GUI_COLOR_BLACK, 1);
+		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sl->scale_size, sliders_scale_thickness, GUI_COLOR_WHITE, 0);
+		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, sliders_scale_thickness - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
-		__gui_draw_rect(db, sl->x1_p, sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
-		__gui_draw_line(db, x + sl->value_p, sl->y1_p, x + sl->value_p, sl->y2_p - 1, GUI_COLOR_WHITE);
+		__gui_draw_rect(x + sl->x1_p, y + sl->y1_p, sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
+		__gui_draw_line(x + sl->value_p, y + sl->y1_p, x + sl->value_p, y + sl->y2_p - 1, GUI_COLOR_WHITE);
 	}
 	else if (sl->orientation == ORIENTATION_VERTICAL)
 	{
 		// temp background
-		//__gui_draw_rect(db, x, y, sliders_h * 2, sl->size, COLORPIP_YELLOW, 1);
+		//__gui_draw_rect(x, y, sliders_h * 2, sl->size, COLORPIP_YELLOW, 1);
 
 		// scale
-		__gui_draw_rect(db, x + sl->scale_x, y + sl->scale_y, sliders_scale_thickness, sl->scale_size, GUI_COLOR_WHITE, 0);
-		__gui_draw_rect(db, x + sl->scale_x + 1, y + sl->scale_y + 1, sliders_scale_thickness - 2, sl->scale_size - 2, GUI_COLOR_BLACK, 1);
+		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sliders_scale_thickness, sl->scale_size, GUI_COLOR_WHITE, 0);
+		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sliders_scale_thickness - 2, sl->scale_size - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
-		__gui_draw_rect(db, sl->x1_p, sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
-		__gui_draw_line(db, sl->x1_p, y + sl->value_p, sl->x2_p - 1, y + sl->value_p, GUI_COLOR_WHITE);
+		__gui_draw_rect(x+ sl->x1_p, y + sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
+		__gui_draw_line(x + sl->x1_p, y + sl->value_p, x + sl->x2_p - 1, y + sl->value_p, GUI_COLOR_WHITE);
 	}
 }
 
@@ -515,63 +330,12 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, const gui_drawb
 void draw_slider(slider_t * sl)
 {
 	window_t * win = get_win(sl->parent);
-	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
-
 	uint16_t x = win->x1 + sl->x;
 	uint16_t y = win->y1 + sl->y;
 
 	slider_update(sl, x, y);
 
-#if GUI_USE_CACHE
-#if DEBUG_SLIDERS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (sl->cache != NULL && ! gui_objects_cache_needs_render(sl->cache, sl->state, sl->value, ""))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("Sliders cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_BUTTONS_CACHE */
-
-	if (sl->cache != NULL && ! gui_objects_cache_needs_render(sl->cache, sl->state, sl->value, ""))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(sl->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (sl->cache == NULL)
-	{
-		sl->cache = gui_objects_cache_create(sl->width, sl->height, GUI_CACHE_TYPE_SLIDER);
-		if (sl->cache == NULL) goto fallback_render;
-	}
-
-	/* Рендерим в кэш */
-	if (gui_objects_cache_begin_render(sl->cache))
-	{
-		const gui_drawbuf_t * cache_db = __gui_get_drawbuf();
-
-		__draw_slider(sl, 0, 0, cache_db);
-
-		gui_objects_cache_end_render(sl->cache, sl->state, sl->value, "");
-	}
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(sl->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* defined(GUI_USE_CACHE) */
-
-	__draw_slider(sl, x, y, gdb);
+	__draw_slider(sl, x, y);
 }
 
 // *************** Common ***************
@@ -646,9 +410,6 @@ uint8_t gui_obj_create(const char * name, ...)
 		lh->width = va_arg(arg, uint32_t);
 		memset(lh->text, '*', lh->width);		// для совместимости, потом убрать
 		lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
-#if GUI_USE_CACHE
-		lh->cache = NULL;
-#endif /* GUI_USE_CACHE */
 
 		idx = win->lh_count;
 		win->lh_count ++;
@@ -675,9 +436,6 @@ uint8_t gui_obj_create(const char * name, ...)
 		bh->x1 = 0;
 		bh->y1 = 0;
 		bh->font = & BUTTONS_FONTP_DEFAULT;
-#if GUI_USE_CACHE
-		bh->cache = NULL;
-#endif /* GUI_USE_CACHE */
 
 		idx = win->bh_count;
 		win->bh_count ++;
@@ -702,9 +460,6 @@ uint8_t gui_obj_create(const char * name, ...)
 		tf->index = win->tf_count;
 		tf->x1 = 0;
 		tf->y1 = 0;
-#if GUI_USE_CACHE
-		tf->cache = NULL;
-#endif /* GUI_USE_CACHE */
 
 		tf->string = (tf_entry_t *) calloc(tf->h_str, sizeof(tf_entry_t));
 		GUI_MEM_ASSERT(tf->string);
@@ -775,10 +530,6 @@ uint8_t gui_obj_create(const char * name, ...)
 			sh->scale_y = sliders_w;
 			sh->scale_size = sh->size - sliders_h * 2;
 		}
-
-#if GUI_USE_CACHE
-		sh->cache = NULL;
-#endif /* GUI_USE_CACHE */
 
 		idx = win->sh_count;
 		win->sh_count ++;
@@ -1009,10 +760,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
 		}
 
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(lh->cache);
-#endif /* GUI_USE_CACHE */
-
 		break;
 
 	case TYPE_BUTTON:
@@ -1032,10 +779,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_REPEAT) bh->is_repeating = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_LONG_PRESS) bh->is_long_press = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_FONT) bh->font = va_arg(arg, gui_prop_font_t *);
-
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(bh->cache);
-#endif /* GUI_USE_CACHE */
 
 		break;
 
@@ -1073,13 +816,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			memset(tf->string, 0, tf->h_str * sizeof(tf_entry_t));
 		}
 
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK)
-		{
-			gui_objects_cache_invalidate(tf->cache);
-			tf->cache->flags = 1;
-		}
-#endif /* GUI_USE_CACHE */
 		break;
 
 	default:
@@ -1214,11 +950,9 @@ void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, ui
 
 void gui_objects_init(void)
 {
-#if ! GUI_USE_CACHE
 	// Buttons background init
 	for (int i = 0; i < BG_DEF_COUNT; i ++)
 		fill_button_bg_buf(& btn_bg[i]);
-#endif /* ! GUI_USE_CACHE */
 }
 
 #endif /* WITHTOUCHGUI */
