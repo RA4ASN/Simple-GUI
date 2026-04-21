@@ -1,8 +1,6 @@
 #include "gui_render_queue.h"
 #include <string.h>
 
-static SDL_Renderer* g_renderer = NULL;
-
 typedef struct {
     RenderCmd buffer[RENDER_QUEUE_CAPACITY];
     uint32_t head;
@@ -16,10 +14,8 @@ typedef struct {
 
 static RenderQueue g_queue;
 
-void render_queue_init(SDL_Renderer* renderer)
+void render_queue_init(void)
 {
-    g_renderer = renderer;
-
     memset(&g_queue, 0, sizeof(g_queue));
     g_queue.mutex     = SDL_CreateMutex();
     g_queue.cond_push = SDL_CreateCond();
@@ -29,7 +25,7 @@ void render_queue_init(SDL_Renderer* renderer)
 
 int render_queue_push(const RenderCmd* cmd)
 {
-    if (!cmd || !g_renderer) return -1;
+    if (!cmd) return -1;
 
     SDL_LockMutex(g_queue.mutex);
 
@@ -44,6 +40,32 @@ int render_queue_push(const RenderCmd* cmd)
     g_queue.buffer[g_queue.tail] = *cmd;
     g_queue.tail = (g_queue.tail + 1) % RENDER_QUEUE_CAPACITY;
     g_queue.count++;
+
+    SDL_CondSignal(g_queue.cond_pop);
+    SDL_UnlockMutex(g_queue.mutex);
+    return 0;
+}
+
+int render_queue_push_batch(const RenderCmd* cmds, uint32_t count)
+{
+    if (!cmds || count == 0 || count > RENDER_QUEUE_CAPACITY)
+        return -1;
+
+    SDL_LockMutex(g_queue.mutex);
+
+    while (RENDER_QUEUE_CAPACITY - g_queue.count < count) {
+        if (g_queue.should_exit) {
+            SDL_UnlockMutex(g_queue.mutex);
+            return -1;
+        }
+        SDL_CondWaitTimeout(g_queue.cond_push, g_queue.mutex, 100);
+    }
+
+    for (uint32_t i = 0; i < count; ++i) {
+        g_queue.buffer[g_queue.tail] = cmds[i];
+        g_queue.tail = (g_queue.tail + 1) % RENDER_QUEUE_CAPACITY;
+        g_queue.count++;
+    }
 
     SDL_CondSignal(g_queue.cond_pop);
     SDL_UnlockMutex(g_queue.mutex);

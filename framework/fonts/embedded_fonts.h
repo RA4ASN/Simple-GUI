@@ -5,7 +5,7 @@
 
 #if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
 
-#include "../gui_sdl2_api.h"
+#include "../sdl2-render/gui_sdl2_api.h"
 
 // моноширинные шрифты
 typedef struct g_UB_Font32_t {

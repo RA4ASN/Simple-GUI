@@ -7,7 +7,7 @@
 
 #include "gui_system.h"
 #include "gui_settings.h"
-#include "gui_sdl2_api.h"
+#include "sdl2-render/gui_sdl2_api.h"
 #include "mslist.h"
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
@@ -136,7 +136,6 @@ enum {
 typedef struct {
 	uint16_t w;
 	uint16_t h;
-//	gui_objbgbuf_t * bgs[BG_COUNT];
 } btn_bg_t;
 
 typedef struct {
@@ -159,6 +158,9 @@ typedef struct {
 	uint16_t y1;
 	uint16_t w;
 	uint16_t h;
+#if GUI_USE_CACHE
+	gui_objects_cache_t * cache;
+#endif /* GUI_USE_CACHE */
 } text_field_t;
 
 typedef struct {
@@ -192,6 +194,9 @@ typedef struct {
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
 	const gui_prop_font_t * font;
+#if GUI_USE_CACHE
+	gui_objects_cache_t * cache;
+#endif /* GUI_USE_CACHE */
 } button_t;
 
 typedef struct {
@@ -210,6 +215,9 @@ typedef struct {
 	uint16_t x;
 	uint16_t y;
 	const gui_mono_font_t * font;
+#if GUI_USE_CACHE
+	gui_objects_cache_t * cache;
+#endif /* GUI_USE_CACHE */
 } label_t;
 
 typedef enum  {
@@ -240,6 +248,9 @@ typedef struct {
 	uint16_t scale_x;
 	uint16_t scale_y;
 	uint16_t scale_size;
+#if GUI_USE_CACHE
+	gui_objects_cache_t * cache;
+#endif /* GUI_USE_CACHE */
 } slider_t;
 
 typedef enum {

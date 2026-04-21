@@ -12,6 +12,7 @@ static LIST_ENTRY gui_objects_list;
 static uint8_t gui_object_count = 0;
 static button_t close_button = { 0, 0, CANCELLED, BUTTON_NON_LOCKED, 0, 0, 0, NO_PARENT_WINDOW, NON_VISIBLE, INT32_MAX, "btс_close", "", };
 static uint8_t opened_windows_count = 1;
+static uint8_t inited = 0;
 
 /* Возврат id parent window */
 uint8_t get_parent_window(void)
@@ -531,6 +532,9 @@ void objects_state (window_t * win)
 			close_button.parent = win->window_id;
 			close_button.visible = VISIBLE;
 			close_button.state = CANCELLED;
+#if GUI_USE_CACHE
+			close_button.cache = NULL;
+#endif /* GUI_USE_CACHE */
 
 			gui_object_t * new_obj = (gui_object_t *) calloc(1, sizeof(gui_object_t));
 			GUI_MEM_ASSERT(new_obj);
@@ -545,6 +549,13 @@ void objects_state (window_t * win)
 		}
 		else
 		{
+#if GUI_USE_CACHE
+            if (close_button.cache != NULL)
+            {
+                gui_objects_cache_destroy(close_button.cache);
+                close_button.cache = NULL;
+            }
+#endif /* GUI_USE_CACHE */
 			GUI_VERIFY(remove_from_gui_list(& close_button));
 			debug_num --;
 			gui_object_count--;
@@ -628,6 +639,7 @@ void gui_initialize (void)
 	open_window(get_win(WINDOW_MAIN));
 
 	gui_user_init();
+	inited = 1;
 }
 
 /* Обновление данных в списке элементов открытых окон */
@@ -719,6 +731,9 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			button_t * bh = (button_t *) val->link;
 			bh->state = val->state;
+#if 0 //GUI_USE_CACHE
+			gui_objects_cache_invalidate(bh->cache);
+#endif /* GUI_USE_CACHE */
 			if (bh->state == RELEASED) close_all_windows();
 		}
 			break;
@@ -728,6 +743,9 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			button_t * bh = (button_t *) val->link;
 			bh->state = val->state;
+#if GUI_USE_CACHE
+			gui_objects_cache_invalidate(bh->cache);
+#endif /* GUI_USE_CACHE */
 			if (bh->state == RELEASED || bh->state == LONG_PRESSED || bh->state == PRESS_REPEATING)
 			{
 				if (! put_to_wm_queue(val->win, WM_MESSAGE_ACTION, TYPE_BUTTON, bh->state == LONG_PRESSED ? LONG_PRESSED : PRESSED, bh->name))
@@ -741,6 +759,9 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			label_t * lh = (label_t *) val->link;
 			lh->state = val->state;
+#if 0 //GUI_USE_CACHE
+			gui_objects_cache_invalidate(lh->cache);
+#endif /* GUI_USE_CACHE */
 			if (lh->state == RELEASED)
 			{
 				if (! put_to_wm_queue(val->win, WM_MESSAGE_ACTION, TYPE_LABEL, PRESSED, lh->name))
@@ -759,6 +780,9 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			slider_t * sh = (slider_t *) val->link;
 			sh->state = val->state;
+#if 0 //GUI_USE_CACHE
+			gui_objects_cache_invalidate(sh->cache);
+#endif /* GUI_USE_CACHE */
 			if (sh->state == PRESSED)
 			{
 				slider_process(sh);
@@ -815,6 +839,8 @@ void process_gui(void)
 	const uint8_t long_press_limit = 20;
 	static uint8_t is_long_press = 0;		// 1 - долгое нажатие уже обработано
 	static uint8_t is_repeating = 0, repeating_cnt = 0;
+
+	if (! inited) return;
 
 	if (__gui_get_touch_event(& tx, & ty))
 	{

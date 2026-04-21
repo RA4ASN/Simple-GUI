@@ -14,7 +14,7 @@
 #include "../gui_settings.h"
 #include "../gui_windows.h"
 #include "embedded_fonts.h"
-#include "../gui_sdl2_api.h"
+#include "../sdl2-render/gui_sdl2_api.h"
 
 //--------------------------------------------------------------
 // Рисует ASCII символ шрифтом одного размера на позиции х, у.
