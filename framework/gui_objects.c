@@ -27,9 +27,6 @@ static btn_bg_t btn_bg[] = {
 };
 enum { BG_DEF_COUNT = ARRAY_SIZE(btn_bg) };
 
-RenderCmd draw_batch[30];
-uint8_t batch_idx = 0;
-
 // *************** Labels ***************
 
 /* Получение ширины метки в пикселях  */
@@ -156,10 +153,22 @@ static void fill_button_bg_buf(btn_bg_t * v)
 //    }
 }
 
+RenderCmd* add_task(RenderCmd **ptr, uint16_t *idx)
+{
+    (*idx)++;
+    RenderCmd *new_ptr = realloc(*ptr, sizeof(RenderCmd) * (*idx));
+
+    ASSERT(new_ptr);
+
+    *ptr = new_ptr;
+    return &new_ptr[*idx - 1]; // Возвращаем указатель на НОВУЮ ячейку
+}
+
 static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cache)
 {
 	window_t * win = get_win(bh->parent);
-	batch_idx = 0;
+	RenderCmd * draw_batch = NULL;
+	uint16_t batch_idx = 0;
 
 	/* Программная отрисовка фона */
 	gui_color_t c1, c2;
@@ -169,28 +178,23 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 	if (to_cache)
 	{
 		if (bh->cache->tex == NULL)
-			draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_CREATE_TEXTURE,
+			*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_CREATE_TEXTURE,
 			.data.create.w = bh->w, .data.create.h = bh->h, .data.create.out_tex = & bh->cache->tex };
 
-		draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = & bh->cache->tex };
+		*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = & bh->cache->tex };
 	}
 
-	draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_DRAW_RECT, .color = GUI_DEFAULTCOLOR, .fill = 1,
+	*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_DRAW_RECT, .color = GUI_DEFAULTCOLOR, .fill = 1,
 		.blend_enabled = 0, .data.rect = { x, y, bh->w - 1, bh->h - 1 } };
 
-	draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_GRAY, .fill = 0,
+	*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_GRAY, .fill = 0,
 		.blend_enabled = 0, .data.rounded_rect = { x, y, bh->w - 1, bh->h - 1, button_round_radius} };
 
-	draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
+	*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
 		.blend_enabled = 0, .data.rounded_rect = { x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius} };
 
-	draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = bh->state == PRESSED ? c2 : c1, .fill = 1,
+	*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = bh->state == PRESSED ? c2 : c1, .fill = 1,
 		.blend_enabled = 0, .data.rounded_rect = { x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius} };
-
-	if (to_cache)
-		draw_batch[batch_idx ++] = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = NULL };
-
-	render_queue_push_batch(draw_batch, batch_idx);
 
 
 	/* Отрисовка текста кнопки */
@@ -203,8 +207,8 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 	{
 		/* Однострочная надпись */
 		int strlenP = get_strwidth_prop(bh->text, bh->font);
-		__gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - bh->font->height) / 2,
-				bh->text, bh->font, textcolor);
+		__gui_print_batch_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - bh->font->height) / 2,
+				bh->text, bh->font, textcolor, &draw_batch, & batch_idx);
 	} else
 	{
 		/* Двухстрочная надпись */
@@ -215,16 +219,22 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 		char * text2 = strtok_r(buf, delimeters, & next);
 
 		int strlenP = get_strwidth_prop(text2, bh->font);
-		__gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor);
+		__gui_print_batch_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor, &draw_batch, & batch_idx);
 
 		text2 = strtok_r(NULL, delimeters, & next);
 		strlenP = get_strwidth_prop(text2, bh->font);
-		__gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - bh->font->height - j,
-				text2, bh->font, textcolor);
+		__gui_print_batch_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - bh->font->height - j,
+				text2, bh->font, textcolor, &draw_batch, & batch_idx);
 	}
 
-	if (bh->is_focus)
-		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
+	if (to_cache)
+		*add_task(&draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = NULL };
+
+	render_queue_push_batch(draw_batch, batch_idx);
+	free(draw_batch);
+
+//	if (bh->is_focus)
+//		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
 }
 
 void draw_button(button_t * bh)
@@ -234,7 +244,7 @@ void draw_button(button_t * bh)
 	uint16_t y1 = win->y1 + bh->y1;
 
 #if GUI_USE_CACHE
-#if 1 //DEBUG_BUTTONS_CACHE
+#if DEBUG_BUTTONS_CACHE
 	static uint32_t cache_hits = 0, cache_misses = 0;
 
 	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
@@ -266,12 +276,8 @@ void draw_button(button_t * bh)
 	}
 
 	/* Рендерим в кэш */
-	//if (gui_objects_cache_begin_render(bh->cache))
-	{
-		__draw_button(bh, 0, 0, 1);
-
-		gui_objects_cache_end_render(bh->cache, bh->state, bh->is_locked, bh->text);
-	}
+	__draw_button(bh, 0, 0, 1);
+	gui_objects_cache_end_render(bh->cache, bh->state, bh->is_locked, bh->text);
 
 	/* Копируем из кэша на экран */
 	if (gui_objects_cache_draw(bh->cache, x1, y1)) goto fallback_render;

@@ -10,6 +10,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <GLES3/gl32.h>
 #include "framework/gui_render_queue.h"
+#include "gui_sdl2_api.h"
 
 void get_cursor_pos(uint16_t * x, uint16_t * y);
 uint8_t check_is_mouse_present(void);
@@ -67,19 +68,6 @@ void * gui_sdl2_thread_fn(void * args)
 		usleep(16000);
 	}
 
-}
-
-int sdl2_print_error(void)
-{
-	const char* err = SDL_GetError();
-	if (err[0])
-	{
-		printf("[SDL Error] %s\n", err);
-		SDL_ClearError();
-		return 1;
-	}
-	else
-		return 0;
 }
 
 static inline void set_draw_state(SDL_Renderer* r, uint32_t color, uint8_t blend_enabled)
@@ -213,7 +201,7 @@ static int sdl2_render_init(void)
 #endif /* ! X11 */
 			);
 
-	sdl2_print_error();
+	SDL2_PRINT_ERROR();
 
 	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
 	if (!renderer)
@@ -425,7 +413,7 @@ void * sdl2_render_thread_fn(void * args)
 	while (render_queue_pop(&cmd) == 0 || global_stop)
 	{
 		parse_cmd(cmd);
-		sdl2_print_error();
+		SDL2_PRINT_ERROR();
 	}
 
 	printf("[RenderThread] Exiting\n");

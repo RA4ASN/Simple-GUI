@@ -16,6 +16,8 @@
 #include "embedded_fonts.h"
 #include "../sdl2-render/gui_sdl2_api.h"
 
+RenderCmd* add_task(RenderCmd **ptr, uint16_t *idx);
+
 //--------------------------------------------------------------
 // Рисует ASCII символ шрифтом одного размера на позиции х, у.
 // Цвет шрифта и фон (шрифт = макс 32 пикселя в ширину)
@@ -105,6 +107,44 @@ static uint16_t UB_Font_DrawPChar32(uint16_t x, uint16_t y, uint8_t ascii, const
 	return (width);
 }
 
+static uint16_t UB_Font_DrawPChar32_batch(uint16_t x, uint16_t y, uint8_t ascii, const gui_prop_font_t * font,
+		gui_color_t vg, RenderCmd ** batch, uint16_t * batch_idx)
+{
+	uint16_t xn, yn, width;
+	uint_fast32_t start_maske, maske;
+	const uint32_t * wert;
+
+	// Проверка границы символа
+	if (ascii < font->first_char)
+		return 0;
+
+	if (ascii > font->last_char)
+		return 0;
+
+	ascii -= font->first_char;
+	wert = &font->table[ascii * (font->height + 1)];
+	width = wert[0];
+	start_maske = 0x01;
+	start_maske = start_maske << (width - 1);
+
+	for (yn = 0; yn < font->height; yn ++)
+	{
+		maske = start_maske;
+		// Установка курсора
+
+		for (xn = 0; xn < width; xn++)
+		{
+			if ((wert[yn + 1] & maske))
+				*add_task(batch, batch_idx) = (RenderCmd){ .type = RQ_CMD_DRAW_POINT, .color = vg,
+						.blend_enabled = 0, .data.point = { x + xn, yn + y } };
+
+			maske = (maske >> 1);
+		}
+	}
+
+	return (width);
+}
+
 //--------------------------------------------------------------
 // Рисование строку пропорционального шрифта с позицией X, Y
 // Цвет шрифта плана и фона (шрифт = макс 32 пикселя в ширину)
@@ -117,6 +157,19 @@ static void gui_UB_Font_DrawPString32(uint16_t x, uint16_t y, const char * ptr, 
 	while (* ptr != 0)
 	{
 		width = UB_Font_DrawPChar32(pos, y, * ptr, font, vg);
+		pos += width;
+		ptr ++;
+	}
+}
+
+static void gui_UB_Font_DrawPString32_batch(uint16_t x, uint16_t y, const char * ptr,
+		const gui_prop_font_t * font, uint32_t vg, RenderCmd ** batch, uint16_t * batch_idx)
+{
+	uint16_t pos = x, width;
+
+	while (* ptr != 0)
+	{
+		width = UB_Font_DrawPChar32_batch(pos, y, * ptr, font, vg, batch, batch_idx);
 		pos += width;
 		ptr ++;
 	}
@@ -180,6 +233,12 @@ void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_
 void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color)
 {
 	gui_UB_Font_DrawPString32(x, y, text, font, color);
+}
+
+void __gui_print_batch_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font,
+		gui_color_t color, RenderCmd ** batch, uint16_t * batch_idx)
+{
+	gui_UB_Font_DrawPString32_batch(x, y, text, font, color, batch, batch_idx);
 }
 
 void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color)

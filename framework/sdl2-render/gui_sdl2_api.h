@@ -55,6 +55,24 @@ typedef SDL_Texture gui_objbgbuf_t;
     for (;;) ; \
 } } while (0)
 
+static inline int _sdl2_print_error_impl(const char* file, int line) {
+    const char* err = SDL_GetError();
+    if (err[0]) {
+        printf("[SDL Error] %s:%d: %s\n", file, line, err);
+        SDL_ClearError();
+        return 1;
+    }
+    return 0;
+}
+
+#define SDL2_PRINT_ERROR() _sdl2_print_error_impl(__FILE__, __LINE__)
+#define SDL2_CHECK(expr) \
+    ({ \
+        __typeof__(expr) _r = (expr); \
+        _sdl2_print_error_impl(__FILE__, __LINE__); \
+        _r; \
+    })
+
 // Вспомогательная: проверка альфа-канала
 static inline uint8_t _gui_is_semi_transparent(gui_color_t color) {
 	return ((color >> 24) & 0xFF) < 255 ? 1 : 0;

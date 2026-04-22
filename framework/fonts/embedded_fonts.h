@@ -6,6 +6,7 @@
 #if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
 
 #include "../sdl2-render/gui_sdl2_api.h"
+#include "../gui_render_queue.h"
 
 // моноширинные шрифты
 typedef struct g_UB_Font32_t {
@@ -27,6 +28,9 @@ typedef g_UB_pFont32	gui_prop_font_t;
 
 void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
 void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
+
+void __gui_print_batch_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font,
+		gui_color_t color, RenderCmd ** batch, uint16_t * batch_idx);
 
 void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
 void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
