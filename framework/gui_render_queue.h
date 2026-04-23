@@ -4,7 +4,7 @@
 #include <SDL2/SDL.h>
 #include <stdint.h>
 
-#define RENDER_QUEUE_CAPACITY 2048
+#define RENDER_QUEUE_CAPACITY 32768
 
 typedef enum {
 	RQ_CMD_DRAW_RECT,
@@ -85,11 +85,43 @@ typedef struct {
 	} data;
 } RenderCmd;
 
+typedef struct {
+    RenderCmd * batch;
+    uint16_t idx;
+    uint8_t is_active;
+} RenderBatch_t;
+
+extern RenderBatch_t * common_batch;
+RenderCmd *add_task2(RenderBatch_t *render_batch);
+
+#define RENDER_BATCH_DECL() \
+    do { \
+    	common_batch->batch = NULL; \
+        common_batch->idx = 0; \
+        common_batch->is_active = 1; \
+    } while(0)
+
+#define RENDER_BATCH_IS_ACTIVE() (common_batch->is_active)
+
+#define RENDER_BATCH_ADD(...) \
+    (*add_task2(common_batch) = (RenderCmd) { __VA_ARGS__ })
+
+#define RENDER_BATCH_FINALIZE() \
+    do { \
+    	if (! common_batch->is_active) break; \
+        render_queue_push_batch(common_batch->batch, common_batch->idx); \
+        free(common_batch->batch); 	\
+        common_batch->idx = 0; 		\
+        common_batch->is_active = 0; \
+    } while(0)
+
 void render_queue_init(void);
 int render_queue_push(const RenderCmd* cmd);
 int render_queue_push_batch(const RenderCmd* cmds, uint32_t count);
 int render_queue_pop(RenderCmd* out_cmd);
 void render_queue_signal_exit(void);
 void render_queue_destroy(void);
+
+RenderCmd * add_task(RenderCmd ** ptr, uint16_t * idx);
 
 #endif /* GUI_RENDER_QUEUE_H */

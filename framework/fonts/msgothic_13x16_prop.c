@@ -33,7 +33,7 @@
 //--------------------------------------------------------------
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
+#if WITHTOUCHGUI
 
 #include "embedded_fonts.h"
 //--------------------------------------------------------------
@@ -153,20 +153,4 @@ gui_prop_font_t msgothic_13x16_prop = {
   126,              // letztes Zeichen (Ascii-Nr)
 };
 
-#if 0
-
-// Для пропорциональных знакогенераторов
-const unifont_t unifont_msgothic_13x16_prop =
-{
-	.decode = ubpfont_decode32,
-	.totalci = ubpfont_totalci32,
-	.font_drawwidthci = ubpfont_width32,
-	.font_drawheight = ubpfont_height32,
-	.font_drawci = ubpfont_render_char32,
-	//
-	.fontraster = & msgothic_13x16_prop,
-	.label = "unifont_msgothic_13x16_prop"
-};
-#endif
-
-#endif /* WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS */
+#endif /* WITHTOUCHGUI */

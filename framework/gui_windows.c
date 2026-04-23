@@ -64,6 +64,9 @@ void open_window(window_t * win)
 	win->is_moving = 0;
 	win->title_align = TITLE_ALIGNMENT_LEFT;
 	set_parent_window(win->window_id);
+#if GUI_USE_CACHE
+	win->cache = NULL;
+#endif /* GUI_USE_CACHE */
 }
 
 /* Освободить выделенную память в куче и обнулить счетчики элементов окна */
@@ -89,6 +92,17 @@ static void free_win_ptr (window_t * win)
             {
                 gui_objects_cache_destroy(win->lh_ptr[i].cache);
                 win->lh_ptr[i].cache = NULL;
+            }
+        }
+    }
+    if (win->sh_ptr != NULL) // Освобождение кэша слайдеров
+    {
+        for (uint8_t i = 0; i < win->sh_count; i++)
+        {
+            if (win->sh_ptr[i].cache != NULL)
+            {
+                gui_objects_cache_destroy(win->sh_ptr[i].cache);
+                win->sh_ptr[i].cache = NULL;
             }
         }
     }
@@ -132,6 +146,10 @@ void close_window(uint8_t parent_action) // 0 - не открывать parent w
 
 		free_win_ptr(win);
 		set_parent_window(NO_PARENT_WINDOW);
+#if GUI_USE_CACHE
+        gui_objects_cache_destroy(win->cache);
+        win->cache = NULL;
+#endif /* GUI_USE_CACHE */
 
 		if (win->parent_id != NO_PARENT_WINDOW && parent_action)	// При закрытии child window открыть parent window, если есть и если разрешено
 			open_window(get_win(win->parent_id));
@@ -431,17 +449,25 @@ void window_set_title_align(title_align_t align)
 	win->title_align = align;
 }
 
-static void __draw_window(window_t * win, uint16_t x, uint16_t y)
+static void __draw_window(window_t * win, uint16_t x, uint16_t y, uint8_t to_cache)
 {
 	GUI_ASSERT(win->w > 0 || win->h > 0);
 
-#if GUI_TRANSPARENT_WINDOWS
-	__gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + window_title_height) :
-			y, x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA);
-#else
-	__gui_draw_rect(drawbuf, x, strcmp(win->title, "") ? (y + window_title_height) :
-			y, win->w, win->h, GUI_WINDOWBGCOLOR, 1);
-#endif /* GUI_TRANSPARENT_WINDOWS */
+	RENDER_BATCH_DECL();
+
+	if (to_cache)
+	{
+		if (win->cache->tex == NULL)
+			RENDER_BATCH_ADD(.type = RQ_CMD_CREATE_TEXTURE, .data.create.w = win->w,
+					.data.create.h = win->h, .data.create.out_tex = & win->cache->tex);
+
+		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & win->cache->tex);
+		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
+	}
+
+	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_SEMITRANSPARENT_RECT, .color = COLORPIP_DARKGRAY,
+			.data.semitransparent_rect = { x, strcmp(win->title, "") ? (y + window_title_height) : y,
+			x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA });
 
 	// вывод заголовка окна
 	if (strcmp(win->title, ""))
@@ -469,9 +495,15 @@ static void __draw_window(window_t * win, uint16_t x, uint16_t y)
 			break;
 		}
 
-		__gui_draw_rect(x, y, win->w, window_title_height, GUI_WINDOWTITLECOLOR, 1);
+		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_WINDOWTITLECOLOR, .fill = 1,
+				.blend_enabled = 0, .data.rect = { x, y, win->w, window_title_height });
 		__gui_print_prop(xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
 	}
+
+	if (to_cache)
+		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
+
+	RENDER_BATCH_FINALIZE();
 }
 
 void draw_window(window_t * win)
@@ -481,7 +513,50 @@ void draw_window(window_t * win)
 
 	if (win->window_id == WINDOW_MAIN) return;
 
-	__draw_window(win, x, y);
+#if GUI_USE_CACHE
+#if DEBUG_WINDOW_CACHE
+	static uint32_t cache_hits = 0, cache_misses = 0;
+
+	if (win->cache != NULL && ! gui_objects_cache_needs_render(win->cache, 0, win->title_align, win->title))
+		cache_hits++;
+	else
+		cache_misses++;
+
+	if ((cache_hits + cache_misses) % 60 == 0)
+	{
+		printf("win cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
+				100.0f * cache_hits / (cache_hits + cache_misses));
+		cache_hits = 0;
+		cache_misses = 0;
+	}
+ #endif /* DEBUG_WINDOW_CACHE */
+
+	if (win->cache != NULL && ! gui_objects_cache_needs_render(win->cache, 0, win->title_align, win->title))
+	{
+		/* Кэш действителен - копируем готовую текстуру */
+		if (gui_objects_cache_draw(win->cache, x, y)) goto fallback_render;
+		return;
+	}
+
+	/* Кэш недействителен - создаём/обновляем */
+	if (win->cache == NULL)
+	{
+		win->cache = gui_objects_cache_create(win->w, win->h, GUI_CACHE_TYPE_WINDOW);
+		if (win->cache == NULL) goto fallback_render;
+	}
+
+	/* Рендерим в кэш */
+	__draw_window(win, 0, 0, 1);
+	gui_objects_cache_end_render(win->cache, 0, win->title_align, win->title);
+
+	/* Копируем из кэша на экран */
+	if (gui_objects_cache_draw(win->cache, x, y)) goto fallback_render;
+	return;
+
+fallback_render:
+#endif /* GUI_USE_CACHE */
+
+	__draw_window(win, x, y, 0);
 }
 
 #endif /* WITHTOUCHGUI */

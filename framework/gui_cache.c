@@ -119,12 +119,9 @@ int gui_objects_cache_needs_render(gui_objects_cache_t * cache, uint8_t state,
 
 void gui_objects_cache_end_render(gui_objects_cache_t * cache, uint8_t state,
 		uint8_t flags, const char * text) {
-	if (cache == NULL || cache->tex == NULL) {
+	if (cache == NULL) {
 		return;
 	}
-
-	/* Завершаем отрисовку в кэш-текстуру */
-	//__gui_cache_texture_end(cache->tex);
 
 	/* Обновляем состояние кэша */
 	cache->valid = 1;

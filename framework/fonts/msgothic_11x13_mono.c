@@ -32,7 +32,7 @@
 //--------------------------------------------------------------
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
+#if WITHTOUCHGUI
 
 #include "embedded_fonts.h"
 //--------------------------------------------------------------
@@ -150,19 +150,4 @@ gui_mono_font_t msgothic_11x13_mono = {
   13,              // Hoehe eines Zeichens  (in Pixel)
 };
 
-#if 0
-// Для моноширинных знакогенераторов
-const unifont_t unifont_msgothic_11x13_mono =
-{
-	.decode = ubmfont_decode32,
-	.totalci = ubmfont_totalci32,
-	.font_drawwidthci = ubmfont_width32,
-	.font_drawheight = ubmfont_height32,
-	.font_drawci = ubmfont_render_char32,
-	//
-	.fontraster = & msgothic_11x13_mono,
-	.label = "unifont_msgothic_11x13_mono"
-};
-#endif
-
-#endif /* WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS */
+#endif /* WITHTOUCHGUI */

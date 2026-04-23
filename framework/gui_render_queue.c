@@ -1,3 +1,8 @@
+#include "gui_user_include.h"
+
+#if WITHTOUCHGUI
+
+#include "gui_includes.h"
 #include "gui_render_queue.h"
 #include <string.h>
 
@@ -13,6 +18,7 @@ typedef struct {
 } RenderQueue;
 
 static RenderQueue g_queue;
+RenderBatch_t * common_batch = NULL;
 
 void render_queue_init(void)
 {
@@ -21,6 +27,10 @@ void render_queue_init(void)
     g_queue.cond_push = SDL_CreateCond();
     g_queue.cond_pop  = SDL_CreateCond();
     g_queue.should_exit = 0;
+
+    common_batch = malloc(sizeof(RenderBatch_t));
+    common_batch->batch = NULL;
+    common_batch->idx = 0;
 }
 
 int render_queue_push(const RenderCmd* cmd)
@@ -112,3 +122,28 @@ void render_queue_destroy(void)
     if (g_queue.mutex)     SDL_DestroyMutex(g_queue.mutex);
     memset(&g_queue, 0, sizeof(g_queue));
 }
+
+RenderCmd * add_task(RenderCmd ** ptr, uint16_t * idx)
+{
+	(* idx) ++;
+	RenderCmd * new_ptr = realloc(* ptr, sizeof(RenderCmd) * (* idx));
+
+	GUI_MEM_ASSERT(new_ptr);
+
+	* ptr = new_ptr;
+	return & new_ptr[* idx - 1];
+}
+
+RenderCmd * add_task2(RenderBatch_t * render_batch)
+{
+	if (! common_batch->is_active) return NULL;
+
+    render_batch->idx ++;
+    RenderCmd * new_ptr = realloc(render_batch->batch, sizeof(RenderCmd) * render_batch->idx);
+    GUI_MEM_ASSERT(new_ptr);
+
+    render_batch->batch = new_ptr;
+    return & render_batch->batch[render_batch->idx - 1];
+}
+
+#endif /* WITHTOUCHGUI */

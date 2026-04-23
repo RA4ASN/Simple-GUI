@@ -4,12 +4,8 @@
 #include "gui_user_include.h"
 
 #if WITHTOUCHGUI
-#if ! GUI_EXTERNAL_FONTS
-	#include "fonts/embedded_fonts.h"
-#else
-	#include "../gui_user_fonts.h"
-#endif
 
+#include "fonts/embedded_fonts.h"
 #include "gui_structs.h"
 
 void * find_gui_obj(obj_type_t type, window_t * win, const char * name);

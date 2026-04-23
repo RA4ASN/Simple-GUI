@@ -262,14 +262,6 @@ static int sdl2_render_init(void)
 
 	SDL_FreeSurface(surface);
 #endif /* MOUSE_EVDEV */
-
-#if GUI_EXTERNAL_FONTS
-	if (TTF_Init() == -1)
-	{
-		printf("TTF init error\n");
-		return 0;
-	}
-#endif /* GUI_EXTERNAL_FONTS */
 }
 
 static void parse_cmd(RenderCmd cmd)
@@ -307,7 +299,6 @@ static void parse_cmd(RenderCmd cmd)
 					cmd.data.copy.tex_w, cmd.data.copy.tex_h };
 			SDL_RenderCopy(renderer, *cmd.data.copy.src, NULL, & dst);
 		}
-
 		break;
 	}
 
@@ -346,7 +337,8 @@ static void parse_cmd(RenderCmd cmd)
 
 	case RQ_CMD_DRAW_SEMITRANSPARENT_RECT:
 	{
-		set_draw_state(renderer, cmd.color, 1);
+		uint32_t c = ((cmd.color) & 0xFFFFFF) | (cmd.data.semitransparent_rect.alpha << 24);
+		set_draw_state(renderer, c, 1);
 		int w = cmd.data.semitransparent_rect.x2 - cmd.data.semitransparent_rect.x1;
 		int h = cmd.data.semitransparent_rect.y2 - cmd.data.semitransparent_rect.y1;
 		SDL_Rect rect_st =
@@ -366,9 +358,7 @@ static void parse_cmd(RenderCmd cmd)
 			*cmd.data.create.out_tex = tex;
 		}
 		else
-		{
 			*cmd.data.create.out_tex = NULL;
-		}
 		break;
 	}
 

@@ -3,7 +3,7 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS
+#if WITHTOUCHGUI
 
 #include "../sdl2-render/gui_sdl2_api.h"
 #include "../gui_render_queue.h"
@@ -29,11 +29,6 @@ typedef g_UB_pFont32	gui_prop_font_t;
 void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
 void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
 
-void __gui_print_batch_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font,
-		gui_color_t color, RenderCmd ** batch, uint16_t * batch_idx);
-void __gui_print_batch_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font,
-		gui_color_t color, RenderCmd ** batch, uint16_t * batch_idx);
-
 void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
 void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
 uint16_t get_strwidth_mono(const char * str, const gui_mono_font_t * font);
@@ -47,6 +42,6 @@ extern gui_prop_font_t msgothic_13x16_prop;
 extern gui_mono_font_t msgothic_15x17_mono;
 extern gui_mono_font_t msgothic_11x13_mono;
 
-#endif /* WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS */
+#endif /* WITHTOUCHGUI */
 
 #endif /* EMBEDDED_FONTS_H_INCLUDED */

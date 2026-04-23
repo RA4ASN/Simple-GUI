@@ -731,7 +731,7 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			button_t * bh = (button_t *) val->link;
 			bh->state = val->state;
-#if 0 //GUI_USE_CACHE
+#if GUI_USE_CACHE
 			gui_objects_cache_invalidate(bh->cache);
 #endif /* GUI_USE_CACHE */
 			if (bh->state == RELEASED) close_all_windows();
@@ -780,7 +780,7 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			slider_t * sh = (slider_t *) val->link;
 			sh->state = val->state;
-#if 0 //GUI_USE_CACHE
+#if GUI_USE_CACHE
 			gui_objects_cache_invalidate(sh->cache);
 #endif /* GUI_USE_CACHE */
 			if (sh->state == PRESSED)

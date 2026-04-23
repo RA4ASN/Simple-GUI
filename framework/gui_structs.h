@@ -322,6 +322,9 @@ typedef struct {
 	uint8_t is_moving;
 	int8_t idx_bh_focus;
 	uint8_t idx_bh_focus_old;
+#if GUI_USE_CACHE
+	gui_objects_cache_t * cache;
+#endif /* GUI_USE_CACHE */
 } window_t;
 
 typedef struct {
