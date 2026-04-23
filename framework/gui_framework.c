@@ -759,7 +759,7 @@ static void set_state_record(gui_object_t * val)
 			GUI_ASSERT(val->link != NULL);
 			label_t * lh = (label_t *) val->link;
 			lh->state = val->state;
-#if 0 //GUI_USE_CACHE
+#if GUI_USE_CACHE
 			gui_objects_cache_invalidate(lh->cache);
 #endif /* GUI_USE_CACHE */
 			if (lh->state == RELEASED)

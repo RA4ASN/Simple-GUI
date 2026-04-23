@@ -29,6 +29,8 @@ typedef g_UB_pFont32	gui_prop_font_t;
 void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color);
 void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color);
 
+void __gui_print_batch_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font,
+		gui_color_t color, RenderCmd ** batch, uint16_t * batch_idx);
 void __gui_print_batch_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font,
 		gui_color_t color, RenderCmd ** batch, uint16_t * batch_idx);
 

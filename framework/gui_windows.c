@@ -81,6 +81,17 @@ static void free_win_ptr (window_t * win)
             }
         }
     }
+    if (win->lh_ptr != NULL) // Освобождение кэша меток
+    {
+        for (uint8_t i = 0; i < win->lh_count; i++)
+        {
+            if (win->lh_ptr[i].cache != NULL)
+            {
+                gui_objects_cache_destroy(win->lh_ptr[i].cache);
+                win->lh_ptr[i].cache = NULL;
+            }
+        }
+    }
 #endif /* GUI_USE_CACHE */
 
 	free(win->bh_ptr);

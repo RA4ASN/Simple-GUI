@@ -27,6 +27,17 @@ static btn_bg_t btn_bg[] = {
 };
 enum { BG_DEF_COUNT = ARRAY_SIZE(btn_bg) };
 
+RenderCmd * add_task(RenderCmd ** ptr, uint16_t * idx)
+{
+	(* idx) ++;
+	RenderCmd * new_ptr = realloc(* ptr, sizeof(RenderCmd) * (* idx));
+
+	GUI_MEM_ASSERT(new_ptr);
+
+	* ptr = new_ptr;
+	return & new_ptr[* idx - 1]; // Возвращаем указатель на НОВУЮ ячейку
+}
+
 // *************** Labels ***************
 
 /* Получение ширины метки в пикселях  */
@@ -57,9 +68,28 @@ uint16_t get_label_height2(const char * name)
 	return lh->height_pix;
 }
 
-static void __draw_label(label_t * lh, uint16_t x, uint16_t y)
+static void __draw_label(label_t * lh, uint16_t x, uint16_t y, uint8_t to_cache)
 {
-	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
+	RenderCmd * draw_batch = NULL;
+	uint16_t batch_idx = 0;
+
+	if (to_cache)
+	{
+		if (lh->cache->tex == NULL)
+			* add_task(& draw_batch, &batch_idx) = (RenderCmd){ .type = RQ_CMD_CREATE_TEXTURE,
+			.data.create.w = lh->width_pix, .data.create.h = lh->height_pix, .data.create.out_tex = & lh->cache->tex };
+
+		* add_task(& draw_batch, & batch_idx) = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = & lh->cache->tex };
+		* add_task(& draw_batch, & batch_idx) = (RenderCmd){ .type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR };
+	}
+
+	__gui_print_batch_mono(x, y, lh->text, lh->font, lh->color, & draw_batch, & batch_idx);
+
+	if (to_cache)
+		* add_task(& draw_batch, & batch_idx) = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = NULL };
+
+	render_queue_push_batch(draw_batch, batch_idx);
+	free(draw_batch);
 }
 
 void draw_label(label_t * lh)
@@ -68,7 +98,7 @@ void draw_label(label_t * lh)
 	uint16_t x = win->x1 + lh->x;
 	uint16_t y = win->y1 + lh->y;
 
-#if 0 //GUI_USE_CACHE
+#if GUI_USE_CACHE
 #if DEBUG_LABELS_CACHE
 	static uint32_t cache_hits = 0, cache_misses = 0;
 
@@ -100,15 +130,8 @@ void draw_label(label_t * lh)
 		if (lh->cache == NULL) goto fallback_render;
 	}
 
-	/* Рендерим в кэш */
-	if (gui_objects_cache_begin_render(lh->cache))
-	{
-		const gui_drawbuf_t * cache_db = __gui_get_drawbuf();
-
-		__draw_label(lh, 0, 0, cache_db);
-
-		gui_objects_cache_end_render(lh->cache, 0, 0, lh->text);
-	}
+	__draw_label(lh, 0, 0, 1);
+	gui_objects_cache_end_render(lh->cache, 0, 0, lh->text);
 
 	/* Копируем из кэша на экран */
 	if (gui_objects_cache_draw(lh->cache, x, y)) goto fallback_render;
@@ -117,7 +140,7 @@ void draw_label(label_t * lh)
 fallback_render:
 #endif /* GUI_USE_CACHE */
 
-	__draw_label(lh, x, y);
+	__draw_label(lh, x, y, 0);
 }
 
 // *************** Buttons ****************
@@ -151,17 +174,6 @@ static void fill_button_bg_buf(btn_bg_t * v)
 //
 //        render_queue_push_batch(draw_batch, 6);
 //    }
-}
-
-RenderCmd* add_task(RenderCmd **ptr, uint16_t *idx)
-{
-    (*idx)++;
-    RenderCmd *new_ptr = realloc(*ptr, sizeof(RenderCmd) * (*idx));
-
-    ASSERT(new_ptr);
-
-    *ptr = new_ptr;
-    return &new_ptr[*idx - 1]; // Возвращаем указатель на НОВУЮ ячейку
 }
 
 static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cache)
@@ -518,6 +530,9 @@ uint8_t gui_obj_create(const char * name, ...)
 		lh->width = va_arg(arg, uint32_t);
 		memset(lh->text, '*', lh->width);		// для совместимости, потом убрать
 		lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
+#if GUI_USE_CACHE
+		lh->cache = NULL;
+#endif /* GUI_USE_CACHE */
 
 		idx = win->lh_count;
 		win->lh_count ++;
@@ -869,6 +884,9 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			lh->height_pix = lh->font->height;
 			lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
 		}
+#if GUI_USE_CACHE
+		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(lh->cache);
+#endif /* GUI_USE_CACHE */
 
 		break;
 

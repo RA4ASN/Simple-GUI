@@ -289,6 +289,13 @@ static void parse_cmd(RenderCmd cmd)
 		break;
 	}
 
+	case RQ_CMD_CLEAR_TARGET:
+	{
+		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
+		SDL_RenderClear(renderer);
+		break;
+	}
+
 	case RQ_CMD_COPY_TEXTURE:
 	{
 		if (cmd.data.copy.src != NULL)
