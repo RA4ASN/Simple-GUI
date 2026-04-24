@@ -58,119 +58,25 @@ uint16_t get_label_height2(const char * name)
 	return lh->height_pix;
 }
 
-static void __draw_label(label_t * lh, uint16_t x, uint16_t y, uint8_t to_cache)
-{
-	RENDER_BATCH_DECL();
-
-#if GUI_USE_CACHE
-	if (to_cache)
-	{
-		if (lh->cache->tex == NULL)
-			RENDER_BATCH_ADD(.type = RQ_CMD_CREATE_TEXTURE, .data.create.w = lh->width_pix,
-					.data.create.h = lh->height_pix, .data.create.out_tex = & lh->cache->tex);
-
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & lh->cache->tex);
-		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
-	}
-
-	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
-
-	if (to_cache)
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
-
-	RENDER_BATCH_FINALIZE();
-#else
-	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
-#endif /* GUI_USE_CACHE */
-}
-
 void draw_label(label_t * lh)
 {
 	window_t * win = get_win(lh->parent);
 	uint16_t x = win->x1 + lh->x;
 	uint16_t y = win->y1 + lh->y;
 
-#if GUI_USE_CACHE
-#if DEBUG_LABELS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (lh->cache != NULL && ! gui_objects_cache_needs_render(lh->cache, 0, 0, lh->text))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("Labels cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_LABELS_CACHE */
-
-	if (lh->cache != NULL && ! gui_objects_cache_needs_render(lh->cache, 0, 0, lh->text))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(lh->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (lh->cache == NULL)
-	{
-		lh->cache = gui_objects_cache_create(lh->width_pix, lh->height_pix, GUI_CACHE_TYPE_LABEL);
-		if (lh->cache == NULL) goto fallback_render;
-	}
-
-	__draw_label(lh, 0, 0, 1);
-	gui_objects_cache_end_render(lh->cache, 0, 0, lh->text);
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(lh->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* GUI_USE_CACHE */
-
-	__draw_label(lh, x, y, 0);
+	RENDER_BATCH_DECL();
+	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
+	RENDER_BATCH_FINALIZE();
 }
 
 // *************** Buttons ****************
 
-static void fill_button_bg_buf(btn_bg_t * v)
-{
-//    const uint16_t w = v->w;
-//    const uint16_t h = v->h;
-//
-//    for (int i = 0; i < BG_COUNT; i ++)
-//    {
-//        RenderCmd draw_batch[6];
-//
-//        draw_batch[0] = (RenderCmd) { .type = RQ_CMD_CREATE_TEXTURE,
-//            .data.create.out_tex = &v->bgs[i], // Адрес переменной, куда рендер запишет указатель
-//            .data.create.w = w, .data.create.h = h
-//        };
-//
-//        draw_batch[1] = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = &v->bgs[i] };
-//
-//        draw_batch[2] = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_GRAY, .fill = 0,
-//            .blend_enabled = 0, .data.rounded_rect = {0, 0, w - 1, h - 1, button_round_radius} };
-//
-//        draw_batch[3] = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
-//            .blend_enabled = 0, .data.rounded_rect = {1, 1, w - 3, h - 3, button_round_radius} };
-//
-//        draw_batch[4] = (RenderCmd){ .type = RQ_CMD_DRAW_ROUNDED_RECT, .color = btn_bg_colors[i], .fill = 1,
-//            .blend_enabled = 0, .data.rounded_rect = {2, 2, w - 5, h - 5, button_round_radius} };
-//
-//        draw_batch[5] = (RenderCmd){ .type = RQ_CMD_SET_TARGET, .data.target = NULL }; // Возврат на экран
-//
-//        render_queue_push_batch(draw_batch, 6);
-//    }
-}
-
-static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cache)
+void draw_button(button_t * bh)
 {
 	window_t * win = get_win(bh->parent);
+	uint16_t x = win->x1 + bh->x1;
+	uint16_t y = win->y1 + bh->y1;
+
 	gui_color_t c1 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED :
 			(bh->is_locked ? GUI_COLOR_BUTTON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED);
 	gui_color_t c2 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED :
@@ -178,29 +84,14 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 
 	RENDER_BATCH_DECL();
 
-#if GUI_USE_CACHE
-	if (to_cache)
-	{
-		if (bh->cache->tex == NULL)
-			RENDER_BATCH_ADD(.type = RQ_CMD_CREATE_TEXTURE, .data.create.w = bh->w, .data.create.h = bh->h,
-					.data.create.out_tex = & bh->cache->tex);
-
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & bh->cache->tex);
-	}
-#endif /* GUI_USE_CACHE */
-
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_DEFAULTCOLOR, .fill = 1,
-		.blend_enabled = 0, .data.rect = { x, y, bh->w - 1, bh->h - 1 });
-
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_GRAY, .fill = 0,
-		.blend_enabled = 0, .data.rounded_rect = { x, y, bh->w - 1, bh->h - 1, button_round_radius});
+		.blend_enabled = 0, .data.rounded_rect = { x, y, bh->w - 1, bh->h - 1, button_round_radius });
 
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
-		.blend_enabled = 0, .data.rounded_rect = { x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius});
+		.blend_enabled = 0, .data.rounded_rect = { x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius });
 
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_ROUNDED_RECT, .color = bh->state == PRESSED ? c2 : c1, .fill = 1,
-		.blend_enabled = 0, .data.rounded_rect = { x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius});
-
+		.blend_enabled = 0, .data.rounded_rect = { x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius });
 
 	/* Отрисовка текста кнопки */
 	const uint16_t shiftX = bh->state == PRESSED ? 1 : 0;
@@ -232,100 +123,10 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 				text2, bh->font, textcolor);
 	}
 
-#if GUI_USE_CACHE
-	if (to_cache)
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
-#endif /* GUI_USE_CACHE */
-
 	RENDER_BATCH_FINALIZE();
 
 //	if (bh->is_focus)
 //		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
-}
-
-void draw_button(button_t * bh)
-{
-	window_t * win = get_win(bh->parent);
-	uint16_t x1 = win->x1 + bh->x1;
-	uint16_t y1 = win->y1 + bh->y1;
-
-#if GUI_USE_CACHE
-#if DEBUG_BUTTONS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("Buttons cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_BUTTONS_CACHE */
-
-	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(bh->cache, x1, y1)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (bh->cache == NULL)
-	{
-		bh->cache = gui_objects_cache_create(bh->w, bh->h, GUI_CACHE_TYPE_BUTTON);
-		if (bh->cache == NULL) goto fallback_render;
-	}
-
-	/* Рендерим в кэш */
-	__draw_button(bh, 0, 0, 1);
-	gui_objects_cache_end_render(bh->cache, bh->state, bh->is_locked, bh->text);
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(bh->cache, x1, y1)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* defined(GUI_USE_CACHE) */
-
-	__draw_button(bh, x1, y1, 0);
-}
-
-static void __draw_close_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cache)
-{
-	uint16_t w = bh->w;
-	uint16_t h = bh->h;
-
-	RENDER_BATCH_DECL();
-
-#if GUI_USE_CACHE
-	if (to_cache)
-	{
-		if (bh->cache->tex == NULL)
-			RENDER_BATCH_ADD(.type = RQ_CMD_CREATE_TEXTURE, .data.create.w = bh->w, .data.create.h = bh->h,
-					.data.create.out_tex = & bh->cache->tex);
-
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & bh->cache->tex);
-	}
-#endif /* GUI_USE_CACHE */
-
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
-			.blend_enabled = 0, .data.rect = { x, y, w, h });
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
-			.data.line = { x, y, x + w, y + h });
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
-			.data.line = { x, y + h, x + w, y });
-
-#if GUI_USE_CACHE
-	if (to_cache)
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
-#endif /* GUI_USE_CACHE */
-
-	RENDER_BATCH_FINALIZE();
 }
 
 void draw_close_button(button_t * bh)
@@ -334,32 +135,19 @@ void draw_close_button(button_t * bh)
 	uint16_t x = win->x1 + bh->x1;
 	uint16_t y = win->y1 + bh->y1;
 
-#if GUI_USE_CACHE
-	if (bh->cache != NULL && ! gui_objects_cache_needs_render(bh->cache, bh->state, bh->is_locked, bh->text))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(bh->cache, x, y)) goto fallback_render;
-		return;
-	}
+	uint16_t w = bh->w;
+	uint16_t h = bh->h;
 
-	/* Кэш недействителен - создаём/обновляем */
-	if (bh->cache == NULL)
-	{
-		bh->cache = gui_objects_cache_create(bh->w, bh->h, GUI_CACHE_TYPE_BUTTON);
-		if (bh->cache == NULL) goto fallback_render;
-	}
+	RENDER_BATCH_DECL();
 
-	__draw_close_button(bh, 0, 0, 1);
-	gui_objects_cache_end_render(bh->cache, bh->state, bh->is_locked, bh->text);
+	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
+			.blend_enabled = 0, .data.rect = { x, y, w, h });
+	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
+			.data.line = { x, y, x + w, y + h });
+	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
+			.data.line = { x, y + h, x + w, y });
 
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(bh->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* GUI_USE_CACHE */
-
-	__draw_close_button(bh, x, y, 0);
+	RENDER_BATCH_FINALIZE();
 }
 
 // *************** Text fields ***************
@@ -386,10 +174,6 @@ void textfield_add_string_old(text_field_t * tf, const char * str, gui_color_t c
 	rec->color_line = color;
 	tf->index ++;
 	tf->index = tf->index >= tf->h_str ? 0 : tf->index;
-#if GUI_USE_CACHE
-	gui_objects_cache_invalidate(tf->cache);
-	if (tf->cache) tf->cache->flags = 1;
-#endif /* GUI_USE_CACHE */
 }
 
 void textfield_add_string(const char * name, const char * str, gui_color_t color)
@@ -403,10 +187,6 @@ void textfield_add_string(const char * name, const char * str, gui_color_t color
 	rec->color_line = color;
 	tf->index ++;
 	tf->index = tf->index >= tf->h_str ? 0 : tf->index;
-#if GUI_USE_CACHE
-	gui_objects_cache_invalidate(tf->cache);
-	if (tf->cache) tf->cache->flags = 1;
-#endif /* GUI_USE_CACHE */
 }
 
 /* Очистить текстовое поле */
@@ -417,27 +197,15 @@ void textfield_clean(const char * name)
 
 	tf->index = 0;
 	memset(tf->string, 0, tf->h_str * sizeof(tf_entry_t));
-#if GUI_USE_CACHE
-	gui_objects_cache_invalidate(tf->cache);
-	if (tf->cache) tf->cache->flags = 1;
-#endif /* GUI_USE_CACHE */
 }
 
-static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, uint8_t to_cache)
+void draw_textfield(text_field_t * tf)
 {
+	window_t * win = get_win(tf->parent);
+	uint16_t x = win->x1 + tf->x1;
+	uint16_t y = win->y1 + tf->y1;
+
 	RENDER_BATCH_DECL();
-
-#if GUI_USE_CACHE
-	if (to_cache)
-	{
-		if (tf->cache->tex == NULL)
-			RENDER_BATCH_ADD(.type = RQ_CMD_CREATE_TEXTURE, .data.create.w = tf->w,
-					.data.create.h = tf->h, .data.create.out_tex = & tf->cache->tex);
-
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & tf->cache->tex);
-		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
-	}
-#endif /* GUI_USE_CACHE */
 
 	int j = tf->index - 1;
 
@@ -450,65 +218,7 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, uint8_t 
 				tf->string[j].text, tf->font, tf->string[j].color_line);
 	}
 
-#if GUI_USE_CACHE
-	if (to_cache)
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
-#endif /* GUI_USE_CACHE */
-
 	RENDER_BATCH_FINALIZE();
-}
-
-void draw_textfield(text_field_t * tf)
-{
-	window_t * win = get_win(tf->parent);
-	uint16_t x = win->x1 + tf->x1;
-	uint16_t y = win->y1 + tf->y1;
-
-#if GUI_USE_CACHE
-#if DEBUG_TFS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (tf->cache != NULL && ! gui_objects_cache_needs_render(tf->cache, 0, tf->cache->flags, ""))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("TFs cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_TFS_CACHE */
-
-	if (tf->cache != NULL && ! gui_objects_cache_needs_render(tf->cache, 0, tf->cache->flags, ""))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(tf->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (tf->cache == NULL)
-	{
-		tf->cache = gui_objects_cache_create(tf->w, tf->h, GUI_CACHE_TYPE_TF);
-		if (tf->cache == NULL) goto fallback_render;
-		tf->cache->flags = 0;
-	}
-
-	/* Рендерим в кэш */
-	__draw_textfield(tf, 0, 0, 1);
-	gui_objects_cache_end_render(tf->cache, 0, tf->cache->flags, "");
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(tf->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* GUI_USE_CACHE */
-
-	__draw_textfield(tf, x, y, 0);
 }
 
 // *************** Sliders ****************
@@ -533,21 +243,16 @@ static void slider_update(slider_t * sl, uint16_t x, uint16_t y)
 	}
 }
 
-static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, uint8_t to_cache)
+/* Отрисовка слайдера */
+void draw_slider(slider_t * sl)
 {
+	window_t * win = get_win(sl->parent);
+	uint16_t x = win->x1 + sl->x;
+	uint16_t y = win->y1 + sl->y;
+
+	slider_update(sl, x, y);
+
 	RENDER_BATCH_DECL();
-
-#if GUI_USE_CACHE
-	if (to_cache)
-	{
-		if (sl->cache->tex == NULL)
-			RENDER_BATCH_ADD(.type = RQ_CMD_CREATE_TEXTURE, .data.create.w = sl->width, .data.create.h = sl->height,
-					.data.create.out_tex = & sl->cache->tex);
-
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & sl->cache->tex);
-		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
-	}
-#endif /* GUI_USE_CACHE */
 
 	if (sl->orientation == ORIENTATION_HORIZONTAL)
 	{
@@ -579,67 +284,7 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, uint8_t to_cach
 				.data.line = { x + sl->x1_p, y + sl->value_p, x + sl->x2_p - 1, y + sl->value_p });
 	}
 
-#if GUI_USE_CACHE
-	if (to_cache)
-		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
-#endif /* GUI_USE_CACHE */
-
 	RENDER_BATCH_FINALIZE();
-}
-
-/* Отрисовка слайдера */
-void draw_slider(slider_t * sl)
-{
-	window_t * win = get_win(sl->parent);
-	uint16_t x = win->x1 + sl->x;
-	uint16_t y = win->y1 + sl->y;
-
-	slider_update(sl, x, y);
-
-#if GUI_USE_CACHE
-#if DEBUG_SLIDERS_CACHE
-	static uint32_t cache_hits = 0, cache_misses = 0;
-
-	if (sl->cache != NULL && ! gui_objects_cache_needs_render(sl->cache, sl->state, sl->value, ""))
-		cache_hits++;
-	else
-		cache_misses++;
-
-	if ((cache_hits + cache_misses) % 60 == 0)
-	{
-		printf("Sliders cache: hits=%u, misses=%u, hit_rate=%.1f%%\n", cache_hits, cache_misses,
-				100.0f * cache_hits / (cache_hits + cache_misses));
-		cache_hits = 0;
-		cache_misses = 0;
-	}
- #endif /* DEBUG_BUTTONS_CACHE */
-
-	if (sl->cache != NULL && ! gui_objects_cache_needs_render(sl->cache, sl->state, sl->value, ""))
-	{
-		/* Кэш действителен - копируем готовую текстуру */
-		if (gui_objects_cache_draw(sl->cache, x, y)) goto fallback_render;
-		return;
-	}
-
-	/* Кэш недействителен - создаём/обновляем */
-	if (sl->cache == NULL)
-	{
-		sl->cache = gui_objects_cache_create(sl->width, sl->height, GUI_CACHE_TYPE_SLIDER);
-		if (sl->cache == NULL) goto fallback_render;
-	}
-
-	/* Рендерим в кэш */
-	__draw_slider(sl, 0, 0, 1);
-	gui_objects_cache_end_render(sl->cache, sl->state, sl->value, "");
-
-	/* Копируем из кэша на экран */
-	if (gui_objects_cache_draw(sl->cache, x, y)) goto fallback_render;
-	return;
-
-fallback_render:
-#endif /* defined(GUI_USE_CACHE) */
-
-	__draw_slider(sl, x, y, 0);
 }
 
 // *************** Common ***************
@@ -714,9 +359,6 @@ uint8_t gui_obj_create(const char * name, ...)
 		lh->width = va_arg(arg, uint32_t);
 		memset(lh->text, '*', lh->width);		// для совместимости, потом убрать
 		lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
-#if GUI_USE_CACHE
-		lh->cache = NULL;
-#endif /* GUI_USE_CACHE */
 
 		idx = win->lh_count;
 		win->lh_count ++;
@@ -743,9 +385,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		bh->x1 = 0;
 		bh->y1 = 0;
 		bh->font = & BUTTONS_FONTP_DEFAULT;
-#if GUI_USE_CACHE
-		bh->cache = NULL;
-#endif /* GUI_USE_CACHE */
+
 		idx = win->bh_count;
 		win->bh_count ++;
 		break;
@@ -776,9 +416,6 @@ uint8_t gui_obj_create(const char * name, ...)
 
 		textfield_update_size(tf);
 
-#if GUI_USE_CACHE
-		tf->cache = NULL;
-#endif /* GUI_USE_CACHE */
 		idx = win->tf_count;
 		win->tf_count ++;
 		break;
@@ -1071,9 +708,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			lh->height_pix = lh->font->height;
 			lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
 		}
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(lh->cache);
-#endif /* GUI_USE_CACHE */
 
 		break;
 
@@ -1094,9 +728,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_REPEAT) bh->is_repeating = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_LONG_PRESS) bh->is_long_press = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_FONT) bh->font = va_arg(arg, gui_prop_font_t *);
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(bh->cache);
-#endif /* GUI_USE_CACHE */
 
 		break;
 
@@ -1107,9 +738,7 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_POS_Y) sh->y = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { sh->x = va_arg(arg, int); sh->y = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_PAYLOAD) sh->value = va_arg(arg, int);
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(sh->cache);
-#endif /* GUI_USE_CACHE */
+
 		break;
 
 	case TYPE_TEXT_FIELD:
@@ -1136,13 +765,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			tf->index = 0;
 			memset(tf->string, 0, tf->h_str * sizeof(tf_entry_t));
 		}
-#if GUI_USE_CACHE
-		if (prop & NEED_INVALIDATION_MASK)
-		{
-			gui_objects_cache_invalidate(tf->cache);
-			if (tf->cache) tf->cache->flags = 1;
-		}
-#endif /* GUI_USE_CACHE */
 
 		break;
 
@@ -1278,9 +900,7 @@ void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, ui
 
 void gui_objects_init(void)
 {
-	// Buttons background init
-	for (int i = 0; i < BG_DEF_COUNT; i ++)
-		fill_button_bg_buf(& btn_bg[i]);
+
 }
 
 #endif /* WITHTOUCHGUI */

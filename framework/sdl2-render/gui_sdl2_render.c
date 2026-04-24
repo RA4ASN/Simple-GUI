@@ -12,12 +12,15 @@
 #include "framework/gui_render_queue.h"
 #include "gui_sdl2_api.h"
 
+#define TARGET_FPS 30
+
 void get_cursor_pos(uint16_t * x, uint16_t * y);
 uint8_t check_is_mouse_present(void);
 void gui_sdl2_walkthrough(void);
 
 SDL_Renderer * renderer = NULL;
 SDL_Window * window;
+SDL_Texture * screen_tex = NULL;
 SDL_Texture * mouse_cursor;
 SDL_mutex* fb_mutex;
 int cursor_width, cursor_height;
@@ -31,10 +34,15 @@ void * gui_sdl2_thread_fn(void * args)
 	while (!queue_ready)
 		usleep(1000);
 
+	uint64_t freq = SDL_GetPerformanceFrequency();
+	uint64_t target_ticks_per_frame = freq / TARGET_FPS;
+
 	gui_initialize();
 
 	while (!global_stop)
 	{
+		Uint64 frame_start = SDL_GetPerformanceCounter();
+
 #if LIQUIDDSP_PROCESS
 		uint16_t x = lwf_get_x();
 		uint16_t y = lwf_get_y();
@@ -63,11 +71,23 @@ void * gui_sdl2_thread_fn(void * args)
 		gui_sdl2_walkthrough();
 
 		RenderCmd present_cmd = { .type = RQ_CMD_PRESENT };
-		render_queue_push(&present_cmd);
+		render_queue_push(& present_cmd);
 
-		usleep(16000);
+		uint64_t frame_end = SDL_GetPerformanceCounter();
+		uint64_t elapsed_ticks = frame_end - frame_start;
+
+		// Расчет и применение задержки
+		// Если цикл выполнился быстрее, чем нужно для TARGET_FPS, ждем остаток времени
+		if (elapsed_ticks < target_ticks_per_frame)
+		{
+			uint64_t remaining_ticks = target_ticks_per_frame - elapsed_ticks;
+			// Конвертируем тики процессора в микросекунды для usleep
+			// Формула: (оставшиеся_тики * 1_000_000) / частота_таймера
+			uint64_t sleep_us = (remaining_ticks * 1000000) / freq;
+
+			if (sleep_us > 0) usleep(sleep_us);
+		}
 	}
-
 }
 
 static inline void set_draw_state(SDL_Renderer* r, uint32_t color, uint8_t blend_enabled)
@@ -211,6 +231,15 @@ static int sdl2_render_init(void)
 		return 0;
 	}
 
+	screen_tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+					SDL_TEXTUREACCESS_TARGET, DIM_X, DIM_Y);
+	if (screen_tex)
+	{
+		SDL_SetTextureBlendMode(screen_tex, SDL_BLENDMODE_BLEND);
+		SDL_SetTextureScaleMode(screen_tex, SDL_ScaleModeBest);
+		SDL_SetRenderTarget(renderer, screen_tex);
+	}
+
 	// Get OpenGL version information
 	const char * glVersion = (const char *) glGetString(GL_VERSION);
 	const char * glRenderer = (const char *) glGetString(GL_RENDERER);
@@ -320,6 +349,21 @@ static void parse_cmd(RenderCmd cmd)
 		break;
 	}
 
+	case RQ_CMD_CREATE_TEXTURE:
+	{
+		SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+				SDL_TEXTUREACCESS_TARGET, cmd.data.create.w, cmd.data.create.h);
+		if (tex)
+		{
+			SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
+			SDL_SetTextureScaleMode(tex, SDL_ScaleModeBest);
+			*cmd.data.create.out_tex = tex;
+		}
+		else
+			*cmd.data.create.out_tex = NULL;
+		break;
+	}
+
 	case RQ_CMD_DRAW_LINE:
 	{
 		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
@@ -347,21 +391,6 @@ static void parse_cmd(RenderCmd cmd)
 		break;
 	}
 
-	case RQ_CMD_CREATE_TEXTURE:
-	{
-		SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-				SDL_TEXTUREACCESS_TARGET, cmd.data.create.w, cmd.data.create.h);
-		if (tex)
-		{
-			SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-			SDL_SetTextureScaleMode(tex, SDL_ScaleModeBest);
-			*cmd.data.create.out_tex = tex;
-		}
-		else
-			*cmd.data.create.out_tex = NULL;
-		break;
-	}
-
 	case RQ_CMD_DRAW_PIXELS:
 	{
 		SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
@@ -384,8 +413,14 @@ static void parse_cmd(RenderCmd cmd)
 	}
 
 	case RQ_CMD_PRESENT:
+	{
+		SDL_SetRenderTarget(renderer, NULL);
+		SDL_RenderCopy(renderer, screen_tex, NULL, NULL);
 		SDL_RenderPresent(renderer);
+		SDL_SetRenderTarget(renderer, screen_tex);
+
 		break;
+	}
 
 	case RQ_CMD_EXIT:
 		return;
@@ -423,8 +458,8 @@ void gui_sdl2_init(void)
 	fb_frame = calloc(DIM_X * DIM_Y, sizeof(uint32_t));
 	ASSERT(fb_frame);
 
-	linux_create_thread(&render_tid, sdl2_render_thread_fn, 50, 1);
-	linux_create_thread(&gui_tid, gui_sdl2_thread_fn, 50, 2);
+	linux_create_thread(&render_tid, sdl2_render_thread_fn, 50, 3);
+	linux_create_thread(&gui_tid, gui_sdl2_thread_fn, 50, 3);
 }
 
 void sdl2_render_close(void)

@@ -15,126 +15,12 @@
 #include "../gui_windows.h"
 #include "embedded_fonts.h"
 
-//--------------------------------------------------------------
-// Рисует ASCII символ шрифтом одного размера на позиции х, у.
-// Цвет шрифта и фон (шрифт = макс 32 пикселя в ширину)
-// Шрифт должен быть передан с оператором &
-//--------------------------------------------------------------
-static void UB_Font_DrawChar32(uint16_t x, uint16_t y, uint8_t ascii, const gui_mono_font_t * font, uint32_t vg)
-{
-	uint16_t xn, yn;
-	uint32_t start_maske, maske;
-	const uint32_t * wert;
-
-	ascii -= 32;
-	wert = & font->table[ascii * font->height];
-
-	start_maske = 0x80;
-	if (font->width > 8)  start_maske = 0x8000;
-	if (font->width > 16) start_maske = 0x80000000;
-
-	for (yn = 0; yn < font->height; yn ++)
-	{
-		maske = start_maske;
-		// Установка курсора
-
-		for (xn = 0; xn < font->width; xn ++)
-		{
-			if ((wert[yn] & maske))
-			{
-				if (RENDER_BATCH_IS_ACTIVE())
-					RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_POINT, .color = vg,
-											.blend_enabled = 1, .data.point = { x + xn, yn + y });
-				else
-					__gui_draw_point(x + xn, yn + y, vg);
-			}
-
-			maske = (maske >> 1);
-		}
-	}
-}
-
-//--------------------------------------------------------------
-// Рисует строку шрифтом одного размера на позиции х, у.
-// Цвет шрифта и фон (шрифт = макс 32 пикселя в ширину)
-// Шрифт должен быть передан с оператором &
-//--------------------------------------------------------------
-static void gui_UB_Font_DrawString32(uint16_t x, uint16_t y, const char * ptr, const gui_mono_font_t * font, uint32_t vg)
-{
-	uint16_t pos;
-
-	pos = x;
-	while (* ptr != '\0') {
-		UB_Font_DrawChar32(pos, y, * ptr, font, vg);
-		pos += font->width;
-		ptr ++;
-	}
-}
-
-//--------------------------------------------------------------
-// Рисование ASCII символ пропорционального шрифта с позицией X, Y
-// Цвет шрифта плана и фона (шрифт = макс 32 пикселя в ширину)
-// Шрифт должен быть передан с оператором &
-// Возвращает: ширину нарисованного символа
-//--------------------------------------------------------------
-static uint16_t UB_Font_DrawPChar32(uint16_t x, uint16_t y, uint8_t ascii, const gui_prop_font_t * font, gui_color_t vg)
-{
-	uint16_t xn, yn, width;
-	uint_fast32_t start_maske, maske;
-	const uint32_t * wert;
-
-	// Проверка границы символа
-	if (ascii < font->first_char)
-		return 0;
-
-	if (ascii > font->last_char)
-		return 0;
-
-	ascii -= font->first_char;
-	wert = &font->table[ascii * (font->height + 1)];
-	width = wert[0];
-	start_maske = 0x01;
-	start_maske = start_maske << (width - 1);
-
-	for (yn = 0; yn < font->height; yn ++)
-	{
-		maske = start_maske;
-		// Установка курсора
-
-		for (xn = 0; xn < width; xn++)
-		{
-			if ((wert[yn + 1] & maske))
-			{
-				if (RENDER_BATCH_IS_ACTIVE())
-					RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_POINT, .color = vg,
-											.blend_enabled = 1, .data.point = { x + xn, yn + y });
-				else
-					__gui_draw_point(x + xn, yn + y, vg);
-			}
-
-			maske = (maske >> 1);
-		}
-	}
-
-	return (width);
-}
-
-//--------------------------------------------------------------
-// Рисование строку пропорционального шрифта с позицией X, Y
-// Цвет шрифта плана и фона (шрифт = макс 32 пикселя в ширину)
-// Шрифт должен быть передан с оператором &
-//--------------------------------------------------------------
-static void gui_UB_Font_DrawPString32(uint16_t x, uint16_t y, const char * ptr, const gui_prop_font_t * font, uint32_t vg)
-{
-	uint16_t pos = x, width;
-
-	while (* ptr != 0)
-	{
-		width = UB_Font_DrawPChar32(pos, y, * ptr, font, vg);
-		pos += width;
-		ptr ++;
-	}
-}
+typedef struct {
+    uint8_t  width;        // Ширина глифа в пикселях
+    uint8_t  height;       // Высота глифа в пикселях
+    const uint32_t *data;  // Указатель на начало битовых данных
+    uint32_t start_mask;   // Предварительно рассчитанная начальная маска
+} gui_glyph_t;
 
 static uint16_t UB_Font_getPcharw32(uint8_t ascii, const gui_prop_font_t * font)
 {
@@ -186,14 +72,126 @@ uint16_t get_strheight_prop(const gui_prop_font_t * font)
 	return font->height;
 }
 
+int gui_get_glyph(uint8_t ascii, const gui_mono_font_t *mono, const gui_prop_font_t *prop,
+		gui_glyph_t *out)
+{
+	if (!out) return -1;
+
+	if (prop != NULL)
+	{
+		// === Пропорциональный шрифт ===
+		if (ascii < prop->first_char || ascii > prop->last_char) return -1;
+		uint16_t idx = ascii - prop->first_char;
+		uint16_t stride = prop->height + 1;
+		const uint32_t *p = &prop->table[idx * stride];
+
+		out->width = (uint8_t) p[0];
+		out->height = prop->height;
+		out->data = &p[1];
+		out->start_mask = (out->width > 0) ? (0x01u << (out->width - 1)) : 0;
+	}
+	else if (mono != NULL)
+	{
+		// === Моноширинный шрифт ===
+		if (ascii < 32) return -1;
+		uint16_t idx = ascii - 32;
+
+		out->width = mono->width;
+		out->height = mono->height;
+		out->data = &mono->table[idx * mono->height];
+
+		if (out->width > 16) out->start_mask = 0x80000000u;
+		else if (out->width > 8) out->start_mask = 0x8000u;
+		else out->start_mask = 0x80u;
+	}
+	else
+	{
+		return -1;
+	}
+	return 0;
+}
+
+void gui_draw_glyph(uint16_t x, uint16_t y, const gui_glyph_t *g, gui_color_t color)
+{
+	if (!g || g->width == 0 || g->height == 0) return;
+
+	for (uint16_t row = 0; row < g->height; row++)
+	{
+		uint32_t bits = g->data[row];
+		uint32_t mask = g->start_mask;
+
+		uint16_t run_start = 0;
+		uint8_t in_run = 0;
+
+		for (uint16_t col = 0; col < g->width; col++)
+		{
+			uint8_t is_set = (bits & mask) ? 1 : 0;
+
+			if (is_set)
+			{
+				if (!in_run)
+				{
+					run_start = col;
+					in_run = 1;
+				}
+			}
+			else
+			{
+				if (in_run)
+				{
+					// Конец пробега → одна команда RECT
+					if (RENDER_BATCH_IS_ACTIVE())
+					{
+						RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = color, .fill = 1,
+								.blend_enabled = 1, .data.rect = { x + run_start, y + row,
+								col - run_start, 1 });
+					}
+					else __gui_draw_rect(x + run_start, y + row, col - run_start, 1, color, 1);
+					in_run = 0;
+				}
+			}
+			mask >>= 1;
+		}
+		// Закрыть пробег, если он дошёл до края
+		if (in_run)
+		{
+			if (RENDER_BATCH_IS_ACTIVE())
+			{
+				RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = color, .fill = 1,
+						.blend_enabled = 1, .data.rect = { x + run_start, y + row,
+						g->width - run_start, 1 });
+			}
+			else __gui_draw_rect(x + run_start, y + row, g->width - run_start, 1, color, 1);
+		}
+	}
+}
+
+void gui_draw_string_glyph(uint16_t x, uint16_t y, const char *text, const gui_mono_font_t *mono,
+		const gui_prop_font_t *prop, gui_color_t color)
+{
+	if (!text) return;
+	uint16_t cur_x = x;
+	gui_glyph_t glyph;
+
+	while (*text != '\0')
+	{
+		if (gui_get_glyph((uint8_t) *text, mono, prop, &glyph) == 0)
+		{
+			gui_draw_glyph(cur_x, y, &glyph, color);
+			cur_x += glyph.width;
+		}
+		text++;
+	}
+}
+
 void __gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color)
 {
-	gui_UB_Font_DrawString32(x, y,	text, font, color);
+	gui_draw_string_glyph(x, y, text, font, NULL, color);
 }
 
 void __gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color)
 {
-	gui_UB_Font_DrawPString32(x, y, text, font, color);
+	gui_draw_string_glyph(x, y, text, NULL, font, color);
 }
 
 void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_font_t * font, gui_color_t color)
@@ -203,7 +201,7 @@ void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_fo
 	const uint16_t yn = y + win->draw_y1;
 
 	RENDER_BATCH_DECL();
-	gui_UB_Font_DrawString32(xn, yn, text, font, color);
+	gui_draw_string_glyph(xn, yn, text, font, NULL, color);
 	RENDER_BATCH_FINALIZE();
 }
 
@@ -214,7 +212,7 @@ void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_fo
 	const uint16_t yn = y + win->draw_y1;
 
 	RENDER_BATCH_DECL();
-	gui_UB_Font_DrawPString32(xn, yn, text, font, color);
+	gui_draw_string_glyph(xn, yn, text, NULL, font, color);
 	RENDER_BATCH_FINALIZE();
 }
 

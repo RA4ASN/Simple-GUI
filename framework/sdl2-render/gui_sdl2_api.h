@@ -8,7 +8,6 @@
 #include <SDL2/SDL.h>
 #include <math.h>
 #include "../gui_render_queue.h"
-#include "../gui_cache.h"
 
 typedef uint32_t 	gui_color_t;
 typedef SDL_Texture gui_objbgbuf_t;
@@ -160,33 +159,6 @@ static inline void __gui_draw_semitransparent_rect(
 
 	render_queue_push(&cmd);
 }
-
-static inline void __gui_copy_texture(SDL_Texture ** tex, uint16_t dst_x, uint16_t dst_y, uint16_t tex_w, uint16_t tex_h)
-{
-	RenderCmd cmd = {
-		.type = RQ_CMD_COPY_TEXTURE,
-		.data.copy.src = tex,
-		.data.copy.dst_x = dst_x,
-		.data.copy.dst_y = dst_y,
-		.data.copy.tex_w = tex_w,
-		.data.copy.tex_h = tex_h,
-	};
-	render_queue_push(& cmd);
-}
-
-#if GUI_USE_CACHE
-
-static inline void __gui_cache_destroy(gui_objects_cache_t * cache)
-{
-	RenderCmd cmd = {
-		.type = RQ_CMD_DESTROY_TEXTURE,
-		.data.destroy.tex = cache->tex,
-		.data.destroy.ptr = cache,
-	};
-	render_queue_push(& cmd);
-}
-
-#endif /* GUI_USE_CACHE */
 
 static inline uint8_t __gui_get_touch_event(uint16_t * x, uint16_t * y) {
 	uint_fast16_t xx, yy, p;
