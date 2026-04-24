@@ -455,6 +455,7 @@ static void __draw_window(window_t * win, uint16_t x, uint16_t y, uint8_t to_cac
 
 	RENDER_BATCH_DECL();
 
+#if GUI_USE_CACHE
 	if (to_cache)
 	{
 		if (win->cache->tex == NULL)
@@ -464,6 +465,7 @@ static void __draw_window(window_t * win, uint16_t x, uint16_t y, uint8_t to_cac
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & win->cache->tex);
 		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
 	}
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_SEMITRANSPARENT_RECT, .color = COLORPIP_DARKGRAY,
 			.data.semitransparent_rect = { x, strcmp(win->title, "") ? (y + window_title_height) : y,
@@ -500,8 +502,10 @@ static void __draw_window(window_t * win, uint16_t x, uint16_t y, uint8_t to_cac
 		__gui_print_prop(xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
 	}
 
+#if GUI_USE_CACHE
 	if (to_cache)
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_FINALIZE();
 }

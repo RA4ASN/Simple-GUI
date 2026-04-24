@@ -62,6 +62,7 @@ static void __draw_label(label_t * lh, uint16_t x, uint16_t y, uint8_t to_cache)
 {
 	RENDER_BATCH_DECL();
 
+#if GUI_USE_CACHE
 	if (to_cache)
 	{
 		if (lh->cache->tex == NULL)
@@ -78,6 +79,9 @@ static void __draw_label(label_t * lh, uint16_t x, uint16_t y, uint8_t to_cache)
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
 
 	RENDER_BATCH_FINALIZE();
+#else
+	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
+#endif /* GUI_USE_CACHE */
 }
 
 void draw_label(label_t * lh)
@@ -174,6 +178,7 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 
 	RENDER_BATCH_DECL();
 
+#if GUI_USE_CACHE
 	if (to_cache)
 	{
 		if (bh->cache->tex == NULL)
@@ -182,6 +187,7 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & bh->cache->tex);
 	}
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_DEFAULTCOLOR, .fill = 1,
 		.blend_enabled = 0, .data.rect = { x, y, bh->w - 1, bh->h - 1 });
@@ -226,8 +232,10 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, uint8_t to_cach
 				text2, bh->font, textcolor);
 	}
 
+#if GUI_USE_CACHE
 	if (to_cache)
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_FINALIZE();
 
@@ -294,6 +302,7 @@ static void __draw_close_button(button_t * bh, uint16_t x, uint16_t y, uint8_t t
 
 	RENDER_BATCH_DECL();
 
+#if GUI_USE_CACHE
 	if (to_cache)
 	{
 		if (bh->cache->tex == NULL)
@@ -302,6 +311,7 @@ static void __draw_close_button(button_t * bh, uint16_t x, uint16_t y, uint8_t t
 
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & bh->cache->tex);
 	}
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
 			.blend_enabled = 0, .data.rect = { x, y, w, h });
@@ -310,8 +320,10 @@ static void __draw_close_button(button_t * bh, uint16_t x, uint16_t y, uint8_t t
 	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
 			.data.line = { x, y + h, x + w, y });
 
+#if GUI_USE_CACHE
 	if (to_cache)
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_FINALIZE();
 }
@@ -415,6 +427,7 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, uint8_t 
 {
 	RENDER_BATCH_DECL();
 
+#if GUI_USE_CACHE
 	if (to_cache)
 	{
 		if (tf->cache->tex == NULL)
@@ -424,6 +437,7 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, uint8_t 
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & tf->cache->tex);
 		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
 	}
+#endif /* GUI_USE_CACHE */
 
 	int j = tf->index - 1;
 
@@ -436,8 +450,10 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, uint8_t 
 				tf->string[j].text, tf->font, tf->string[j].color_line);
 	}
 
+#if GUI_USE_CACHE
 	if (to_cache)
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_FINALIZE();
 }
@@ -521,6 +537,7 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, uint8_t to_cach
 {
 	RENDER_BATCH_DECL();
 
+#if GUI_USE_CACHE
 	if (to_cache)
 	{
 		if (sl->cache->tex == NULL)
@@ -530,6 +547,7 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, uint8_t to_cach
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = & sl->cache->tex);
 		RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET, .color = GUI_DEFAULTCOLOR);
 	}
+#endif /* GUI_USE_CACHE */
 
 	if (sl->orientation == ORIENTATION_HORIZONTAL)
 	{
@@ -561,8 +579,10 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, uint8_t to_cach
 				.data.line = { x + sl->x1_p, y + sl->value_p, x + sl->x2_p - 1, y + sl->value_p });
 	}
 
+#if GUI_USE_CACHE
 	if (to_cache)
 		RENDER_BATCH_ADD(.type = RQ_CMD_SET_TARGET, .data.target = NULL);
+#endif /* GUI_USE_CACHE */
 
 	RENDER_BATCH_FINALIZE();
 }
