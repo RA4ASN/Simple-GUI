@@ -458,8 +458,8 @@ void gui_sdl2_init(void)
 	fb_frame = calloc(DIM_X * DIM_Y, sizeof(uint32_t));
 	ASSERT(fb_frame);
 
-	linux_create_thread(&render_tid, sdl2_render_thread_fn, 50, 3);
-	linux_create_thread(&gui_tid, gui_sdl2_thread_fn, 50, 3);
+	linux_create_thread(&render_tid, sdl2_render_thread_fn, 10, 2);
+	linux_create_thread(&gui_tid, gui_sdl2_thread_fn, 50, 2);
 }
 
 void sdl2_render_close(void)
