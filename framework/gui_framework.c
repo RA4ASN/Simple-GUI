@@ -612,9 +612,30 @@ void gui_put_event(gui_event_type type, uint16_t code)
 /* Системный обработчик слайдера в момент его перемещения */
 static void slider_process(slider_t * sl)
 {
-	int v = sl->value + roundf((sl->orientation ? gui.vector_move_x : gui.vector_move_y) / sl->step);
-	if (v >= 0 && v <= sl->size / sl->step)
-		sl->value = v;
+	window_t * win = get_win(sl->parent);
+	if (!win)
+	{
+		gui.vector_move_x = 0;
+		gui.vector_move_y = 0;
+		return;
+	}
+
+	// Позиция касания относительно начала шкалы
+	int pos = 0;
+	if (sl->orientation == ORIENTATION_HORIZONTAL)
+		pos = (int) gui.last_pressed_x - win->x1 - (int) sl->x - sl->scale_x;
+	else
+		pos = (int) gui.last_pressed_y - win->y1 - (int) sl->y - sl->scale_y;
+
+	// Расчёт значения (0..100) на основе абсолютной позиции
+	if (sl->scale_size > 0)
+	{
+		// Округление до ближайшего целого
+		int v = (pos * 100 + sl->scale_size / 2) / sl->scale_size;
+		if (v < 0) v = 0;
+		if (v > 100) v = 100;
+		sl->value = (uint8_t) v;
+	}
 
 	gui.vector_move_x = 0;
 	gui.vector_move_y = 0;
@@ -666,20 +687,20 @@ static void update_gui_objects_list(void)
 			p->is_long_press = 0;
 			p->is_repeating = 0;
 		}
-		else if (p->type == TYPE_SLIDER)
-		{
-			slider_t * sh = (slider_t *) p->link;
-			window_t * win = get_win(sh->parent);
-			p->x1 = (sh->x + sh->x1_p - touch_area_enlarge) < 0 ? 0 : (sh->x + sh->x1_p - touch_area_enlarge);
-			p->x2 = (sh->x + sh->x2_p + touch_area_enlarge) > WITHGUIMAXX ? WITHGUIMAXX : (sh->x + sh->x2_p + touch_area_enlarge);
-			p->y1 = (sh->y + sh->y1_p - touch_area_enlarge) < 0 ? 0 : (sh->y + sh->y1_p - touch_area_enlarge);
-			p->y2 = (sh->y + sh->y2_p + touch_area_enlarge) > WITHGUIMAXY ? WITHGUIMAXY : (sh->y + sh->y2_p + touch_area_enlarge);
-			p->state = sh->state;
-			p->visible = sh->visible;
-			p->is_trackable = 1;
-			p->is_long_press = 0;
-			p->is_repeating = 0;
-		}
+	    else if (p->type == TYPE_SLIDER)
+	    {
+	        slider_t * sh = (slider_t *) p->link;
+	        p->x1 = (sh->x - touch_area_enlarge) < 0 ? 0 : (sh->x - touch_area_enlarge);
+	        p->x2 = (sh->x + sh->width + touch_area_enlarge) > WITHGUIMAXX ? WITHGUIMAXX : (sh->x + sh->width + touch_area_enlarge);
+	        p->y1 = (sh->y - touch_area_enlarge) < 0 ? 0 : (sh->y - touch_area_enlarge);
+	        p->y2 = (sh->y + sh->height + touch_area_enlarge) > WITHGUIMAXY ? WITHGUIMAXY : (sh->y + sh->height + touch_area_enlarge);
+
+	        p->state = sh->state;
+	        p->visible = sh->visible;
+	        p->is_trackable = 1;
+	        p->is_long_press = 0;
+	        p->is_repeating = 0;
+	    }
 		else if (p->type == TYPE_TOUCH_AREA)
 		{
 			touch_area_t * ta = (touch_area_t *) p->link;
@@ -818,9 +839,9 @@ void process_gui(void)
 	static uint8_t is_long_press = 0;		// 1 - долгое нажатие уже обработано
 	static uint8_t is_repeating = 0, repeating_cnt = 0;
 
-	if (! inited) return;
+	if (!inited) return;
 
-	if (__gui_get_touch_event(& tx, & ty))
+	if (__gui_get_touch_event(&tx, &ty))
 	{
 		gui.last_pressed_x = tx;
 		gui.last_pressed_y = ty;
@@ -837,12 +858,12 @@ void process_gui(void)
 //	if (IsListEmpty(& gui_objects_list))
 //		return;
 
-	if (gui.state == CANCELLED && gui.is_touching_screen && ! gui.is_after_touch)
+	if (gui.state == CANCELLED && gui.is_touching_screen && !gui.is_after_touch)
 	{
 		GUI_ASSERT(! IsListEmpty(& gui_objects_list));
 
 		PLIST_ENTRY current_entry = gui_objects_list.Blink; // Обход списка в обратном порядке
-		while (current_entry != & gui_objects_list)
+		while (current_entry != &gui_objects_list)
 		{
 			p = CONTAINING_RECORD(current_entry, gui_object_t, list_entry);
 			w = p->win;
@@ -850,20 +871,22 @@ void process_gui(void)
 			uint16_t x1 = p->x1 + w->x1, y1 = p->y1 + w->y1;
 			uint16_t x2 = p->x2 + w->x1, y2 = p->y2 + w->y1;
 
-			if (x1 < gui.last_pressed_x && x2 > gui.last_pressed_x && y1 < gui.last_pressed_y && y2 > gui.last_pressed_y
-					&& p->state != DISABLED && p->visible == VISIBLE)
+			if (x1 < gui.last_pressed_x && x2 > gui.last_pressed_x && y1 < gui.last_pressed_y
+					&& y2 > gui.last_pressed_y && p->state != DISABLED && p->visible == VISIBLE)
 			{
 				gui.state = PRESSED;
 				is_long_press = 0;
 				is_repeating = 0;
 				long_press_counter = 0;
+				x_old = tx;
+				y_old = ty;
 				break;
 			}
 			current_entry = current_entry->Blink; // Переход к предыдущему элементу
 		}
 	}
 
-	if (gui.is_tracking && ! gui.is_touching_screen)
+	if (gui.is_tracking && !gui.is_touching_screen)
 	{
 		gui.is_tracking = 0;
 		gui.vector_move_x = 0;
@@ -877,23 +900,22 @@ void process_gui(void)
 		GUI_ASSERT(p != NULL);
 		if (p->is_trackable && gui.is_touching_screen)
 		{
-			gui.vector_move_x = x_old ? gui.last_pressed_x - x_old : 0;
-			gui.vector_move_y = y_old ? gui.last_pressed_y - y_old : 0;
+			gui.vector_move_x = (int16_t) gui.last_pressed_x - (int16_t) x_old;
+			gui.vector_move_y = (int16_t) gui.last_pressed_y - (int16_t) y_old;
 
 			if (gui.vector_move_x != 0 || gui.vector_move_y != 0)
 			{
 				gui.is_tracking = 1;
-//				GUI_DEBUG_PRINT("move x: %d, move y: %d\n", gui.vector_move_x, gui.vector_move_y);
 			}
 
 			p->state = PRESSED;
 			set_state_record(p);
-
 			x_old = gui.last_pressed_x;
 			y_old = gui.last_pressed_y;
 		}
-		else if (w->x1 + p->x1 < gui.last_pressed_x && w->x1 + p->x2 > gui.last_pressed_x &&
-				 w->y1 + p->y1 < gui.last_pressed_y && w->y1 + p->y2 > gui.last_pressed_y && ! gui.is_after_touch)
+		else if (w->x1 + p->x1 < gui.last_pressed_x && w->x1 + p->x2 > gui.last_pressed_x
+				&& w->y1 + p->y1 < gui.last_pressed_y && w->y1 + p->y2 > gui.last_pressed_y
+				&& !gui.is_after_touch)
 		{
 			if (gui.is_touching_screen)
 			{
@@ -902,7 +924,7 @@ void process_gui(void)
 
 				if (is_repeating)
 				{
-					repeating_cnt ++;
+					repeating_cnt++;
 					if (repeating_cnt > autorepeat_delay)
 					{
 						repeating_cnt = 0;
@@ -910,15 +932,13 @@ void process_gui(void)
 						set_state_record(p);
 					}
 				}
-				else
-					set_state_record(p);
+				else set_state_record(p);
 
 				if (p->is_long_press)
 				{
-					if(gui.state != LONG_PRESSED && ! is_long_press && lp_delay_10ms(0))
-						long_press_counter ++;
+					if (gui.state != LONG_PRESSED && !is_long_press && lp_delay_10ms(0)) long_press_counter++;
 
-					if(long_press_counter > long_press_limit)
+					if (long_press_counter > long_press_limit)
 					{
 						long_press_counter = 0;
 						gui.state = LONG_PRESSED;
@@ -926,10 +946,9 @@ void process_gui(void)
 				}
 				else if (p->is_repeating)
 				{
-					if (! is_repeating)
-						long_press_counter ++;
+					if (!is_repeating) long_press_counter++;
 
-					if(long_press_counter > long_press_limit)
+					if (long_press_counter > long_press_limit)
 					{
 						long_press_counter = 0;
 						repeating_cnt = 0;
@@ -937,8 +956,7 @@ void process_gui(void)
 					}
 				}
 			}
-			else
-				gui.state = RELEASED;
+			else gui.state = RELEASED;
 		}
 		else
 		{
@@ -946,7 +964,7 @@ void process_gui(void)
 			gui.state = CANCELLED;
 			p->state = CANCELLED;
 			set_state_record(p);
-			gui.is_after_touch = 1; 	// точка непрерывного касания вышла за пределы выбранного элемента, не поддерживающего tracking
+			gui.is_after_touch = 1; // точка непрерывного касания вышла за пределы выбранного элемента, не поддерживающего tracking
 		}
 	}
 
@@ -954,8 +972,8 @@ void process_gui(void)
 	{
 		GUI_ASSERT(p != NULL);
 		p->state = RELEASED;			// для запуска обработчика нажатия
-		if(! is_long_press)				// если было долгое нажатие, обработчик по короткому не запускать
-			set_state_record(p);
+		if (!is_long_press)	// если было долгое нажатие, обработчик по короткому не запускать
+		set_state_record(p);
 		p->state = CANCELLED;
 		set_state_record(p);
 		gui.is_after_touch = 0;
@@ -974,56 +992,50 @@ void process_gui(void)
 
 	TIME_PROFILE_START(gui);
 
-	for(uint8_t i = 0; i < opened_windows_count; i ++)
+	for (uint8_t i = 0; i < opened_windows_count; i++)
 	{
 		window_t * win = get_win(gui.win[i]);
 		gui.current_drawing_window = gui.win[i];
 
 		if (win->state == VISIBLE)
 		{
-			if (win->first_call)
-				win->onVisibleProcess();					// запуск только процедуры инициализации окна
+			if (win->first_call) win->onVisibleProcess();// запуск только процедуры инициализации окна
 			else
 			{
 				draw_window(win);
 
-				win->onVisibleProcess();					// запуск процедуры фоновой обработки для окна
+				win->onVisibleProcess();			// запуск процедуры фоновой обработки для окна
 
 				// отрисовка принадлежащих окну элементов
 				PLIST_ENTRY current_entry = gui_objects_list.Flink;
-				while (current_entry != & gui_objects_list)
+				while (current_entry != &gui_objects_list)
 				{
 					gui_object_t * p = CONTAINING_RECORD(current_entry, gui_object_t, list_entry);
 
 					if (p->type == TYPE_BUTTON)
 					{
 						button_t * bh = (button_t *) p->link;
-						if (bh->visible && bh->parent == win->window_id)
-							draw_button(bh);
+						if (bh->visible && bh->parent == win->window_id) draw_button(bh);
 					}
 					else if (p->type == TYPE_CLOSE_BUTTON)
 					{
 						button_t * bh = (button_t *) p->link;
-						if (bh->visible && bh->parent == win->window_id)
-							draw_close_button(bh);
+						if (bh->visible && bh->parent == win->window_id) draw_close_button(bh);
 					}
 					else if (p->type == TYPE_LABEL)
 					{
 						label_t * lh = (label_t *) p->link;
-						if (lh->visible && lh->parent == win->window_id)
-							draw_label(lh);
+						if (lh->visible && lh->parent == win->window_id) draw_label(lh);
 					}
 					else if (p->type == TYPE_SLIDER)
 					{
 						slider_t * sh = (slider_t *) p->link;
-						if (sh->visible && sh->parent == win->window_id)
-							draw_slider(sh);
+						if (sh->visible && sh->parent == win->window_id) draw_slider(sh);
 					}
 					else if (p->type == TYPE_TEXT_FIELD)
 					{
 						text_field_t * tf = (text_field_t *) p->link;
-						if (tf->visible && tf->parent == win->window_id)
-							draw_textfield(tf);
+						if (tf->visible && tf->parent == win->window_id) draw_textfield(tf);
 					}
 
 					current_entry = current_entry->Flink;

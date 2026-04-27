@@ -459,6 +459,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		sh->visible = 1;
 		sh->size = va_arg(arg, int);
 		sh->step = va_arg(arg, int);
+		if (sh->step == 0) sh->step = 1;
 		sh->value = 0;
 		sh->value_old = 255;
 		sh->index = win->sh_count;
