@@ -44,17 +44,16 @@ void * gui_sdl2_thread_fn(void * args)
 		Uint64 frame_start = SDL_GetPerformanceCounter();
 
 #if LIQUIDDSP_PROCESS
-		uint16_t x = lwf_get_x();
-		uint16_t y = lwf_get_y();
-		uint16_t w = lwf_get_w();
-		uint16_t h = lwf_get_h();
-		uint32_t * d = ldsp_get_ptr();
+		uint16_t x, y, w, h;
+		lfw_get_dims(&x, &y, &w, &h);
+		uint32_t * ldsp_frame = ldsp_get_frame();
 
-		if (d)
+		if (ldsp_frame)
 		{
-			RenderCmd draw_cmd = { .type = RQ_CMD_DRAW_PIXELS, .data.draw.raw_pixels = d, .data.draw.x = x,
-					.data.draw.y = y, .data.draw.w = w, .data.draw.h = h, };
-			render_queue_push(&draw_cmd);
+			RENDER_BATCH_DECL();
+			RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET);
+			RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_PIXELS, .data.draw = { ldsp_frame, x, y, w, h });
+			RENDER_BATCH_FINALIZE();
 		}
 #else
 		SDL_LockMutex(fb_mutex);
