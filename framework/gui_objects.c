@@ -493,8 +493,8 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, const gui_drawb
 		__gui_draw_rect(db, x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, sliders_scale_thickness - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
-		__gui_draw_rect(db, sl->x1_p, sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
-		__gui_draw_line(db, x + sl->value_p, sl->y1_p, x + sl->value_p, sl->y2_p - 1, GUI_COLOR_WHITE);
+		__gui_draw_rect(db, x + sl->x1_p, y + sl->y1_p, sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
+		__gui_draw_line(db, x + sl->value_p, y + sl->y1_p, x + sl->value_p, y + sl->y2_p - 1, GUI_COLOR_WHITE);
 	}
 	else if (sl->orientation == ORIENTATION_VERTICAL)
 	{
@@ -506,8 +506,8 @@ static void __draw_slider(slider_t * sl, uint16_t x, uint16_t y, const gui_drawb
 		__gui_draw_rect(db, x + sl->scale_x + 1, y + sl->scale_y + 1, sliders_scale_thickness - 2, sl->scale_size - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
-		__gui_draw_rect(db, sl->x1_p, sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
-		__gui_draw_line(db, sl->x1_p, y + sl->value_p, sl->x2_p - 1, y + sl->value_p, GUI_COLOR_WHITE);
+		__gui_draw_rect(db, x + sl->x1_p, y + sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p, sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
+		__gui_draw_line(db, x + sl->x1_p, y + sl->value_p, x + sl->x2_p - 1, y + sl->value_p, GUI_COLOR_WHITE);
 	}
 }
 
