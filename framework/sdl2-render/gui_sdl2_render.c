@@ -51,7 +51,7 @@ void * gui_sdl2_thread_fn(void * args)
 		if (ldsp_frame)
 		{
 			RENDER_BATCH_DECL();
-			RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR_TARGET);
+			RENDER_BATCH_ADD(.type = RQ_CMD_CLEAR);
 			RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_PIXELS, .data.draw = { ldsp_frame, x, y, w, h });
 			RENDER_BATCH_FINALIZE();
 		}
@@ -69,7 +69,7 @@ void * gui_sdl2_thread_fn(void * args)
 
 		gui_sdl2_walkthrough();
 
-		RenderCmd present_cmd = { .type = RQ_CMD_PRESENT };
+		RenderCmd present_cmd = { .type = RQ_CMD_FINALIZE };
 		render_queue_push(& present_cmd);
 
 		uint64_t frame_end = SDL_GetPerformanceCounter();
@@ -86,105 +86,6 @@ void * gui_sdl2_thread_fn(void * args)
 
 			if (sleep_us > 0) usleep(sleep_us);
 		}
-	}
-}
-
-static inline void set_draw_state(SDL_Renderer* r, uint32_t color, uint8_t blend_enabled)
-{
-	uint8_t a = (color >> 24) & 0xFF;
-	uint8_t r_ch = (color >> 16) & 0xFF;
-	uint8_t g = (color >> 8) & 0xFF;
-	uint8_t b = color & 0xFF;
-
-	if (blend_enabled || a < 255)
-		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
-	else
-		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
-
-	SDL_SetRenderDrawColor(r, r_ch, g, b, a);
-}
-
-static void draw_rounded_rect(SDL_Renderer* r, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
-		uint16_t radius, uint8_t fill)
-{
-	if (w == 0 || h == 0)
-		return;
-	uint16_t rad = radius;
-	if (rad > w / 2)
-		rad = w / 2;
-	if (rad > h / 2)
-		rad = h / 2;
-
-	if (rad == 0)
-	{
-		SDL_Rect rect = { x, y, w, h };
-		fill ? SDL_RenderFillRect(r, &rect) : SDL_RenderDrawRect(r, &rect);
-		return;
-	}
-
-	int x1 = x + w - 1;
-	int y1 = y + h - 1;
-	int cx_tl = x + rad, cy_tl = y + rad;
-	int cx_tr = x1 - rad, cy_tr = y + rad;
-	int cx_bl = x + rad, cy_bl = y1 - rad;
-	int cx_br = x1 - rad, cy_br = y1 - rad;
-
-	if (fill)
-	{
-		if (w > 2 * rad)
-		{
-			SDL_Rect mid =
-			{ x + rad, y, w - 2 * rad, h };
-			SDL_RenderFillRect(r, &mid);
-		}
-		if (h > 2 * rad)
-		{
-			SDL_Rect left =
-			{ x, y + rad, rad, h - 2 * rad };
-			SDL_Rect right =
-			{ x1 - rad + 1, y + rad, rad, h - 2 * rad };
-			SDL_RenderFillRect(r, &left);
-			SDL_RenderFillRect(r, &right);
-		}
-
-#define FILL_QUARTER(cx, cy, sx, sy) \
-        do { \
-            for (int dy = 0; dy <= rad; dy++) { \
-                int dx = (int)sqrt((double)(rad * rad - dy * dy)); \
-                for (int dx2 = 0; dx2 <= dx; dx2++) { \
-                    SDL_RenderDrawPoint(r, cx + sx * dx2, cy + sy * dy); \
-                } \
-            } \
-        } while(0)
-
-		FILL_QUARTER(cx_tl, cy_tl, -1, -1);
-		FILL_QUARTER(cx_tr, cy_tr, 1, -1);
-		FILL_QUARTER(cx_bl, cy_bl, -1, 1);
-		FILL_QUARTER(cx_br, cy_br, 1, 1);
-#undef FILL_QUARTER
-	}
-	else
-	{
-		SDL_RenderDrawLine(r, x + rad, y, x1 - rad, y);
-		SDL_RenderDrawLine(r, x + rad, y1, x1 - rad, y1);
-		SDL_RenderDrawLine(r, x, y + rad, x, y1 - rad);
-		SDL_RenderDrawLine(r, x1, y + rad, x1, y1 - rad);
-
-		// Ограничиваем сегменты для производительности
-		const int seg = (rad > 32) ? 32 : rad;
-		SDL_Point pts[4 * (seg + 1)];
-		int idx = 0;
-		double step = (M_PI / 2.0) / seg;
-
-		for (int i = 0; i <= seg; i++)
-		{
-			double t = i * step;
-			pts[idx++] = (SDL_Point) { cx_tl - (int) (rad * cos(t)), cy_tl - (int) (rad * sin(t)) };
-			pts[idx++] = (SDL_Point) { cx_tr + (int) (rad * cos(t)), cy_tr - (int) (rad * sin(t)) };
-			pts[idx++] = (SDL_Point) { cx_br + (int) (rad * cos(t)), cy_br + (int) (rad * sin(t)) };
-			pts[idx++] = (SDL_Point) { cx_bl - (int) (rad * cos(t)), cy_bl + (int) (rad * sin(t)) };
-		}
-		SDL_RenderDrawPoints(r, pts, idx);
 	}
 }
 
@@ -296,43 +197,16 @@ static void parse_cmd(RenderCmd cmd)
 {
 	switch (cmd.type)
 	{
-	case RQ_CMD_SET_TARGET:
+	case RQ_CMD_CLEAR:
 	{
-		if (cmd.data.target != NULL)
-		{
-			if (*cmd.data.target == NULL)
-				break; // Защита от NULL-текстуры
-			SDL_SetRenderTarget(renderer, *cmd.data.target);
-		}
-		else
-			SDL_SetRenderTarget(renderer, NULL);
-		break;
-	}
-
-	case RQ_CMD_CLEAR_TARGET:
-	{
-		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
+		__sdl2_set_draw_state(renderer, cmd.color, cmd.blend_enabled);
 		SDL_RenderClear(renderer);
-		break;
-	}
-
-	case RQ_CMD_COPY_TEXTURE:
-	{
-		if (cmd.data.copy.src != NULL)
-		{
-			if (*cmd.data.copy.src == NULL)
-				break; // Защита от NULL-текстуры
-
-			SDL_Rect dst = { cmd.data.copy.dst_x, cmd.data.copy.dst_y,
-					cmd.data.copy.tex_w, cmd.data.copy.tex_h };
-			SDL_RenderCopy(renderer, *cmd.data.copy.src, NULL, & dst);
-		}
 		break;
 	}
 
 	case RQ_CMD_DRAW_RECT:
 	{
-		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
+		__sdl2_set_draw_state(renderer, cmd.color, cmd.blend_enabled);
 		SDL_Rect rect =
 		{ cmd.data.rect.x, cmd.data.rect.y, cmd.data.rect.w, cmd.data.rect.h };
 		cmd.fill ? SDL_RenderFillRect(renderer, &rect) : SDL_RenderDrawRect(renderer, &rect);
@@ -341,31 +215,16 @@ static void parse_cmd(RenderCmd cmd)
 
 	case RQ_CMD_DRAW_ROUNDED_RECT:
 	{
-		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
-		draw_rounded_rect(renderer, cmd.data.rounded_rect.x, cmd.data.rounded_rect.y,
+		__sdl2_set_draw_state(renderer, cmd.color, cmd.blend_enabled);
+		__sdl2_draw_rounded_rect(renderer, cmd.data.rounded_rect.x, cmd.data.rounded_rect.y,
 				cmd.data.rounded_rect.w, cmd.data.rounded_rect.h, cmd.data.rounded_rect.radius,
 				cmd.fill);
 		break;
 	}
 
-	case RQ_CMD_CREATE_TEXTURE:
-	{
-		SDL_Texture* tex = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
-				SDL_TEXTUREACCESS_TARGET, cmd.data.create.w, cmd.data.create.h);
-		if (tex)
-		{
-			SDL_SetTextureBlendMode(tex, SDL_BLENDMODE_BLEND);
-			SDL_SetTextureScaleMode(tex, SDL_ScaleModeBest);
-			*cmd.data.create.out_tex = tex;
-		}
-		else
-			*cmd.data.create.out_tex = NULL;
-		break;
-	}
-
 	case RQ_CMD_DRAW_LINE:
 	{
-		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
+		__sdl2_set_draw_state(renderer, cmd.color, cmd.blend_enabled);
 		SDL_RenderDrawLine(renderer, cmd.data.line.x1, cmd.data.line.y1, cmd.data.line.x2,
 				cmd.data.line.y2);
 		break;
@@ -373,7 +232,7 @@ static void parse_cmd(RenderCmd cmd)
 
 	case RQ_CMD_DRAW_POINT:
 	{
-		set_draw_state(renderer, cmd.color, cmd.blend_enabled);
+		__sdl2_set_draw_state(renderer, cmd.color, cmd.blend_enabled);
 		SDL_RenderDrawPoint(renderer, cmd.data.point.x, cmd.data.point.y);
 		break;
 	}
@@ -381,7 +240,7 @@ static void parse_cmd(RenderCmd cmd)
 	case RQ_CMD_DRAW_SEMITRANSPARENT_RECT:
 	{
 		uint32_t c = ((cmd.color) & 0xFFFFFF) | (cmd.data.semitransparent_rect.alpha << 24);
-		set_draw_state(renderer, c, 1);
+		__sdl2_set_draw_state(renderer, c, 1);
 		int w = cmd.data.semitransparent_rect.x2 - cmd.data.semitransparent_rect.x1;
 		int h = cmd.data.semitransparent_rect.y2 - cmd.data.semitransparent_rect.y1;
 		SDL_Rect rect_st =
@@ -402,16 +261,7 @@ static void parse_cmd(RenderCmd cmd)
 		break;
 	}
 
-	case RQ_CMD_DESTROY_TEXTURE:
-	{
-		if (cmd.data.destroy.tex)
-			SDL_DestroyTexture(cmd.data.destroy.tex);
-		if (cmd.data.destroy.ptr)
-			free(cmd.data.destroy.ptr);
-		break;
-	}
-
-	case RQ_CMD_PRESENT:
+	case RQ_CMD_FINALIZE:
 	{
 		SDL_SetRenderTarget(renderer, NULL);
 		SDL_RenderCopy(renderer, screen_tex, NULL, NULL);
@@ -420,9 +270,6 @@ static void parse_cmd(RenderCmd cmd)
 
 		break;
 	}
-
-	case RQ_CMD_EXIT:
-		return;
 	}
 }
 

@@ -110,6 +110,90 @@ static inline void __gui_draw_rounded_rect(
 	render_queue_push(&cmd);
 }
 
+static void __sdl2_draw_rounded_rect(SDL_Renderer* r, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+		uint16_t radius, uint8_t fill)
+{
+	if (w == 0 || h == 0)
+		return;
+	uint16_t rad = radius;
+	if (rad > w / 2)
+		rad = w / 2;
+	if (rad > h / 2)
+		rad = h / 2;
+
+	if (rad == 0)
+	{
+		SDL_Rect rect = { x, y, w, h };
+		fill ? SDL_RenderFillRect(r, &rect) : SDL_RenderDrawRect(r, &rect);
+		return;
+	}
+
+	int x1 = x + w - 1;
+	int y1 = y + h - 1;
+	int cx_tl = x + rad, cy_tl = y + rad;
+	int cx_tr = x1 - rad, cy_tr = y + rad;
+	int cx_bl = x + rad, cy_bl = y1 - rad;
+	int cx_br = x1 - rad, cy_br = y1 - rad;
+
+	if (fill)
+	{
+		if (w > 2 * rad)
+		{
+			SDL_Rect mid =
+			{ x + rad, y, w - 2 * rad, h };
+			SDL_RenderFillRect(r, &mid);
+		}
+		if (h > 2 * rad)
+		{
+			SDL_Rect left =
+			{ x, y + rad, rad, h - 2 * rad };
+			SDL_Rect right =
+			{ x1 - rad + 1, y + rad, rad, h - 2 * rad };
+			SDL_RenderFillRect(r, &left);
+			SDL_RenderFillRect(r, &right);
+		}
+
+#define FILL_QUARTER(cx, cy, sx, sy) \
+        do { \
+            for (int dy = 0; dy <= rad; dy++) { \
+                int dx = (int)sqrt((double)(rad * rad - dy * dy)); \
+                for (int dx2 = 0; dx2 <= dx; dx2++) { \
+                    SDL_RenderDrawPoint(r, cx + sx * dx2, cy + sy * dy); \
+                } \
+            } \
+        } while(0)
+
+		FILL_QUARTER(cx_tl, cy_tl, -1, -1);
+		FILL_QUARTER(cx_tr, cy_tr, 1, -1);
+		FILL_QUARTER(cx_bl, cy_bl, -1, 1);
+		FILL_QUARTER(cx_br, cy_br, 1, 1);
+#undef FILL_QUARTER
+	}
+	else
+	{
+		SDL_RenderDrawLine(r, x + rad, y, x1 - rad, y);
+		SDL_RenderDrawLine(r, x + rad, y1, x1 - rad, y1);
+		SDL_RenderDrawLine(r, x, y + rad, x, y1 - rad);
+		SDL_RenderDrawLine(r, x1, y + rad, x1, y1 - rad);
+
+		// Ограничиваем сегменты для производительности
+		const int seg = (rad > 32) ? 32 : rad;
+		SDL_Point pts[4 * (seg + 1)];
+		int idx = 0;
+		double step = (M_PI / 2.0) / seg;
+
+		for (int i = 0; i <= seg; i++)
+		{
+			double t = i * step;
+			pts[idx++] = (SDL_Point) { cx_tl - (int) (rad * cos(t)), cy_tl - (int) (rad * sin(t)) };
+			pts[idx++] = (SDL_Point) { cx_tr + (int) (rad * cos(t)), cy_tr - (int) (rad * sin(t)) };
+			pts[idx++] = (SDL_Point) { cx_br + (int) (rad * cos(t)), cy_br + (int) (rad * sin(t)) };
+			pts[idx++] = (SDL_Point) { cx_bl - (int) (rad * cos(t)), cy_bl + (int) (rad * sin(t)) };
+		}
+		SDL_RenderDrawPoints(r, pts, idx);
+	}
+}
+
 // Отрисовка линии
 static inline void __gui_draw_line(unsigned int x1,
 		unsigned int y1, unsigned int x2, unsigned int y2, gui_color_t color) {
@@ -158,6 +242,21 @@ static inline void __gui_draw_semitransparent_rect(
 			| ((uint32_t) base_g << 8) | base_b;
 
 	render_queue_push(&cmd);
+}
+
+static inline void __sdl2_set_draw_state(SDL_Renderer* r, uint32_t color, uint8_t blend_enabled)
+{
+	uint8_t a = (color >> 24) & 0xFF;
+	uint8_t r_ch = (color >> 16) & 0xFF;
+	uint8_t g = (color >> 8) & 0xFF;
+	uint8_t b = color & 0xFF;
+
+	if (blend_enabled || a < 255)
+		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_BLEND);
+	else
+		SDL_SetRenderDrawBlendMode(r, SDL_BLENDMODE_NONE);
+
+	SDL_SetRenderDrawColor(r, r_ch, g, b, a);
 }
 
 static inline uint8_t __gui_get_touch_event(uint16_t * x, uint16_t * y) {

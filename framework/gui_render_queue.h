@@ -13,14 +13,8 @@ typedef enum {
 	RQ_CMD_DRAW_POINT,
 	RQ_CMD_DRAW_SEMITRANSPARENT_RECT,
 	RQ_CMD_DRAW_PIXELS,
-	RQ_CMD_SET_TARGET,
-	RQ_CMD_CLEAR_TARGET,
-	RQ_CMD_COPY_TEXTURE,
-	RQ_CMD_CREATE_TEXTURE,
-	RQ_CMD_UPDATE_TEXTURE,
-	RQ_CMD_DESTROY_TEXTURE,
-	RQ_CMD_PRESENT,
-	RQ_CMD_EXIT,
+	RQ_CMD_CLEAR,
+	RQ_CMD_FINALIZE,
 } RenderCmdType;
 
 typedef struct {
@@ -56,32 +50,11 @@ typedef struct {
 			uint8_t alpha;
 		} semitransparent_rect;
 
-		// RQ_CMD_SET_TARGET
-		SDL_Texture** target;
-
-		// RQ_CMD_CREATE_TEXTURE
-		struct {
-			SDL_Texture** out_tex;
-			uint16_t w, h;
-		} create;
-
-		// RQ_CMD_DESTROY_TEXTURE
-		struct {
-			SDL_Texture* tex;
-			void* ptr;
-		} destroy;
-
 		// RQ_CMD_DRAW_PIXELS
 		struct {
 			uint32_t* raw_pixels;
 			uint16_t x, y, w, h;
 		} draw;
-
-		//RQ_CMD_COPY_TEXTURE
-		struct {
-			SDL_Texture** src;
-			uint16_t dst_x, dst_y, tex_w, tex_h;
-		} copy;
 	} data;
 } RenderCmd;
 
