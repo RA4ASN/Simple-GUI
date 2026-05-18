@@ -3,14 +3,15 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if WITHTOUCHGUI && ! GUI_USEPORT
 
 #include <SDL2/SDL.h>
 #include <math.h>
 #include "../gui_render_queue.h"
 
-typedef uint32_t 	gui_color_t;
-typedef SDL_Texture gui_objbgbuf_t;
+typedef uint32_t 		gui_color_t;
+typedef SDL_cond		gui_cond_t;
+typedef SDL_mutex 		gui_mutex_t;
 
 #define GUI_TFTRGB(red, green, blue) \
 	(  (uint32_t) ( \
@@ -71,6 +72,51 @@ static inline int _sdl2_print_error_impl(const char* file, int line) {
         _sdl2_print_error_impl(__FILE__, __LINE__); \
         _r; \
     })
+
+static inline gui_mutex_t * _gui_mutex_init(void)
+{
+	return SDL_CreateMutex();
+}
+
+static inline void _gui_mutex_destroy(gui_mutex_t * m)
+{
+	SDL_DestroyMutex(m);
+}
+
+static inline void _gui_mutex_lock(gui_mutex_t * m)
+{
+	SDL_LockMutex(m);
+}
+
+static inline void _gui_mutex_unlock(gui_mutex_t * m)
+{
+	SDL_UnlockMutex(m);
+}
+
+static inline gui_cond_t * _gui_cond_init(void)
+{
+	return SDL_CreateCond();
+}
+
+static inline void _gui_cond_wait(gui_cond_t * c, gui_mutex_t * m)
+{
+	SDL_CondWait(c, m);
+}
+
+static inline void _gui_cond_signal(gui_cond_t * c)
+{
+	SDL_CondSignal(c);
+}
+
+static inline void _gui_cond_broadcast(gui_cond_t * c)
+{
+	SDL_CondBroadcast(c);
+}
+
+static inline void _gui_cond_destroy(gui_cond_t * c)
+{
+	SDL_DestroyCond(c);
+}
 
 // Вспомогательная: проверка альфа-канала
 static inline uint8_t _gui_is_semi_transparent(gui_color_t color) {
@@ -285,5 +331,5 @@ do { \
 #define TIME_PROFILE_STOP(label, desc) ((void)0)
 #endif /* GUI_TIME_PROFILER */
 
-#endif /* WITHTOUCHGUI */
+#endif /* WITHTOUCHGUI  && ! GUI_USEPORT */
 #endif /* GUI_SDL2_API_H_INCLUDED */

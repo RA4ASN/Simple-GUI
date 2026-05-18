@@ -2,6 +2,8 @@
 
 #include "gui_user_include.h"
 
+#if WITHTOUCHGUI && ! GUI_USEPORT
+
 #include "common.h"
 #include "ldsp.h"
 //#include "gui/framework/gui_events.h"
@@ -390,4 +392,4 @@ void sdl2_events_start(void)
 }
 
 #endif /* SDL2_EVENTS */
-
+#endif /* WITHTOUCHGUI && ! GUI_USEPORT */

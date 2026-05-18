@@ -65,7 +65,7 @@ typedef struct {
 } RenderBatch_t;
 
 extern RenderBatch_t * common_batch;
-RenderCmd *add_task2(RenderBatch_t *render_batch);
+RenderCmd *add_task(RenderBatch_t *render_batch);
 
 #define RENDER_BATCH_DECL() \
     do { \
@@ -77,7 +77,7 @@ RenderCmd *add_task2(RenderBatch_t *render_batch);
 #define RENDER_BATCH_IS_ACTIVE() (common_batch->is_active)
 
 #define RENDER_BATCH_ADD(...) \
-    (*add_task2(common_batch) = (RenderCmd) { __VA_ARGS__ })
+    (*add_task(common_batch) = (RenderCmd) { __VA_ARGS__ })
 
 #define RENDER_BATCH_FINALIZE() \
     do { \
@@ -94,7 +94,5 @@ int render_queue_push_batch(const RenderCmd* cmds, uint32_t count);
 int render_queue_pop(RenderCmd* out_cmd);
 void render_queue_signal_exit(void);
 void render_queue_destroy(void);
-
-RenderCmd * add_task(RenderCmd ** ptr, uint16_t * idx);
 
 #endif /* GUI_RENDER_QUEUE_H */
