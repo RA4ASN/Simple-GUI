@@ -5,7 +5,6 @@
 #if WITHTOUCHGUI
 
 #include "gui_includes.h"
-#include "gui_render_queue.h"
 
 const label_t label_default = 	{ 0, CANCELLED, 0, NON_VISIBLE, "", "", GUI_COLOR_WHITE, };
 const button_t button_default = { 0, 0, CANCELLED, BUTTON_NON_LOCKED, 0, 1, 0, 0, NON_VISIBLE, INT32_MAX, "", "", };
@@ -64,9 +63,7 @@ void draw_label(label_t * lh)
 	uint16_t x = win->x1 + lh->x;
 	uint16_t y = win->y1 + lh->y;
 
-	RENDER_BATCH_DECL();
 	__gui_print_mono(x, y, lh->text, lh->font, lh->color);
-	RENDER_BATCH_FINALIZE();
 }
 
 // *************** Buttons ****************
@@ -82,16 +79,9 @@ void draw_button(button_t * bh)
 	gui_color_t c2 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED :
 			(bh->is_locked ? GUI_COLOR_BUTTON_PR_LOCKED : GUI_COLOR_BUTTON_PR_NON_LOCKED);
 
-	RENDER_BATCH_DECL();
-
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_GRAY, .fill = 0,
-		.blend_enabled = 0, .data.rounded_rect = { x, y, bh->w - 1, bh->h - 1, button_round_radius });
-
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_ROUNDED_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
-		.blend_enabled = 0, .data.rounded_rect = { x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius });
-
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_ROUNDED_RECT, .color = bh->state == PRESSED ? c2 : c1, .fill = 1,
-		.blend_enabled = 0, .data.rounded_rect = { x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius });
+	__gui_draw_rounded_rect(x, y, bh->w - 1, bh->h - 1, button_round_radius, GUI_COLOR_GRAY, 0);
+	__gui_draw_rounded_rect(x + 1, y + 1, bh->w - 3, bh->h - 3, button_round_radius, GUI_COLOR_BLACK, 0);
+	__gui_draw_rounded_rect(x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius, bh->state == PRESSED ? c2 : c1, 1);
 
 	/* Отрисовка текста кнопки */
 	const uint16_t shiftX = bh->state == PRESSED ? 1 : 0;
@@ -123,10 +113,8 @@ void draw_button(button_t * bh)
 				text2, bh->font, textcolor);
 	}
 
-	RENDER_BATCH_FINALIZE();
-
-//	if (bh->is_focus)
-//		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
+	if (bh->is_focus)
+		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
 }
 
 void draw_close_button(button_t * bh)
@@ -138,16 +126,9 @@ void draw_close_button(button_t * bh)
 	uint16_t w = bh->w;
 	uint16_t h = bh->h;
 
-	RENDER_BATCH_DECL();
-
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_BLACK, .fill = 0,
-			.blend_enabled = 0, .data.rect = { x, y, w, h });
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
-			.data.line = { x, y, x + w, y + h });
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_BLACK, .blend_enabled = 1,
-			.data.line = { x, y + h, x + w, y });
-
-	RENDER_BATCH_FINALIZE();
+	__gui_draw_rect(x, y, w, h, GUI_COLOR_BLACK, 0);
+	__gui_draw_line(x, y, x + w, y + h, GUI_COLOR_BLACK);
+	__gui_draw_line(x, y + h, x + w, y, GUI_COLOR_BLACK);
 }
 
 // *************** Text fields ***************
@@ -205,8 +186,6 @@ void draw_textfield(text_field_t * tf)
 	uint16_t x = win->x1 + tf->x1;
 	uint16_t y = win->y1 + tf->y1;
 
-	RENDER_BATCH_DECL();
-
 	int j = tf->index - 1;
 
 	for (uint8_t i = 0; i < tf->h_str; i ++, j --)
@@ -217,8 +196,6 @@ void draw_textfield(text_field_t * tf)
 		__gui_print_mono(x, y + tf->font->height * pos,
 				tf->string[j].text, tf->font, tf->string[j].color_line);
 	}
-
-	RENDER_BATCH_FINALIZE();
 }
 
 // *************** Sliders ****************
@@ -252,39 +229,29 @@ void draw_slider(slider_t * sl)
 
 	slider_update(sl, x, y);
 
-	RENDER_BATCH_DECL();
-
 	if (sl->orientation == ORIENTATION_HORIZONTAL)
 	{
 		// scale
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_WHITE, .fill = 0,
-				.blend_enabled = 0, .data.rect = { x + sl->scale_x, y + sl->scale_y, sl->scale_size, sliders_scale_thickness });
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_BLACK, .fill = 1,
-				.blend_enabled = 0, .data.rect = { x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, sliders_scale_thickness - 2 });
+		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sl->scale_size, sliders_scale_thickness, GUI_COLOR_WHITE, 0);
+		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, sliders_scale_thickness - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, .fill = 1,
-				.blend_enabled = 0, .data.rect = { x + sl->x1_p, y + sl->y1_p, sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p });
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_WHITE, .blend_enabled = 0,
-				.data.line = { x + sl->value_p, y + sl->y1_p, x + sl->value_p, y + sl->y2_p - 1 });
+		__gui_draw_rect(x + sl->x1_p, y + sl->y1_p, sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p,
+				sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
+		__gui_draw_line(x + sl->value_p, y + sl->y1_p, x + sl->value_p, y + sl->y2_p - 1, GUI_COLOR_WHITE);
 
 	}
 	else if (sl->orientation == ORIENTATION_VERTICAL)
 	{
 		// scale
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_WHITE, .fill = 0,
-				.blend_enabled = 0, .data.rect = { x + sl->scale_x, y + sl->scale_y, sliders_scale_thickness, sl->scale_size });
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_COLOR_BLACK, .fill = 1,
-				.blend_enabled = 0, .data.rect = { x + sl->scale_x + 1, y + sl->scale_y + 1, sliders_scale_thickness - 2, sl->scale_size - 2 });
+		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sliders_scale_thickness, sl->scale_size, GUI_COLOR_WHITE, 0);
+		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sliders_scale_thickness - 2, sl->scale_size - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, .fill = 1,
-				.blend_enabled = 0, .data.rect = { x + sl->x1_p, y + sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p });
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_LINE, .color = GUI_COLOR_WHITE, .blend_enabled = 0,
-				.data.line = { x + sl->x1_p, y + sl->value_p, x + sl->x2_p - 1, y + sl->value_p });
+		__gui_draw_rect(x + sl->x1_p, y + sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p,
+				sl->state == PRESSED ? GUI_COLOR_BUTTON_PR_NON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED, 1);
+		__gui_draw_line(x + sl->x1_p, y + sl->value_p, x + sl->x2_p - 1, y + sl->value_p, GUI_COLOR_WHITE);
 	}
-
-	RENDER_BATCH_FINALIZE();
 }
 
 // *************** Common ***************

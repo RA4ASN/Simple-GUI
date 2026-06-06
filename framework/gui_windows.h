@@ -1,3 +1,5 @@
+// Simple GUI от RA4ASN
+
 #ifndef GUI_WINDOWS_H
 #define GUI_WINDOWS_H
 

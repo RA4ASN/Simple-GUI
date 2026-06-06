@@ -416,10 +416,8 @@ void draw_window(window_t * win)
 
 	GUI_ASSERT(win->w > 0 || win->h > 0);
 
-	RENDER_BATCH_DECL();
-	RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_SEMITRANSPARENT_RECT, .color = COLORPIP_DARKGRAY,
-			.data.semitransparent_rect = { x, strcmp(win->title, "") ? (y + window_title_height) : y,
-			x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA });
+	__gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + window_title_height) : y,
+			x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA);
 
 	// вывод заголовка окна
 	if (strcmp(win->title, ""))
@@ -447,12 +445,9 @@ void draw_window(window_t * win)
 			break;
 		}
 
-		RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = GUI_WINDOWTITLECOLOR, .fill = 1,
-				.blend_enabled = 0, .data.rect = { x, y, win->w, window_title_height });
+		__gui_draw_rect(x, y, win->w, window_title_height, GUI_WINDOWTITLECOLOR, 1);
 		__gui_print_prop(xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
 	}
-
-	RENDER_BATCH_FINALIZE();
 }
 
 #endif /* WITHTOUCHGUI */

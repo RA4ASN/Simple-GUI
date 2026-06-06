@@ -140,29 +140,16 @@ void gui_draw_glyph(uint16_t x, uint16_t y, const gui_glyph_t *g, gui_color_t co
 				if (in_run)
 				{
 					// Конец пробега → одна команда RECT
-					if (RENDER_BATCH_IS_ACTIVE())
-					{
-						RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = color, .fill = 1,
-								.blend_enabled = 1, .data.rect = { x + run_start, y + row,
-								col - run_start, 1 });
-					}
-					else __gui_draw_rect(x + run_start, y + row, col - run_start, 1, color, 1);
+					__gui_draw_rect(x + run_start, y + row, col - run_start, 1, color, 1);
 					in_run = 0;
 				}
 			}
 			mask >>= 1;
 		}
+
 		// Закрыть пробег, если он дошёл до края
 		if (in_run)
-		{
-			if (RENDER_BATCH_IS_ACTIVE())
-			{
-				RENDER_BATCH_ADD(.type = RQ_CMD_DRAW_RECT, .color = color, .fill = 1,
-						.blend_enabled = 1, .data.rect = { x + run_start, y + row,
-						g->width - run_start, 1 });
-			}
-			else __gui_draw_rect(x + run_start, y + row, g->width - run_start, 1, color, 1);
-		}
+			__gui_draw_rect(x + run_start, y + row, g->width - run_start, 1, color, 1);
 	}
 }
 
@@ -200,9 +187,7 @@ void gui_print_mono(uint16_t x, uint16_t y, const char * text, const gui_mono_fo
 	const uint16_t xn = x + win->draw_x1;
 	const uint16_t yn = y + win->draw_y1;
 
-	RENDER_BATCH_DECL();
 	gui_draw_string_glyph(xn, yn, text, font, NULL, color);
-	RENDER_BATCH_FINALIZE();
 }
 
 void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_font_t * font, gui_color_t color)
@@ -211,9 +196,7 @@ void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_fo
 	const uint16_t xn = x + win->draw_x1;
 	const uint16_t yn = y + win->draw_y1;
 
-	RENDER_BATCH_DECL();
 	gui_draw_string_glyph(xn, yn, text, NULL, font, color);
-	RENDER_BATCH_FINALIZE();
 }
 
 #endif /* WITHTOUCHGUI */

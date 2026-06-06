@@ -1,3 +1,5 @@
+// Simple GUI от RA4ASN
+
 #ifndef GUI_SETTINGS_H_INCLUDED
 #define GUI_SETTINGS_H_INCLUDED
 

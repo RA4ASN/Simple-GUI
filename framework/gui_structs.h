@@ -1,3 +1,5 @@
+// Simple GUI от RA4ASN
+
 #ifndef GUI_STRUCTS_H_INCLUDED
 #define GUI_STRUCTS_H_INCLUDED
 
@@ -7,7 +9,7 @@
 
 #include "gui_system.h"
 #include "gui_settings.h"
-#include "sdl2-render/gui_sdl2_api.h"
+#include "gui_sdl2_api.h"
 #include "mslist.h"
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)

@@ -1,3 +1,5 @@
+// Simple GUI от RA4ASN
+
 #ifndef GUI_SYSTEM_H_INCLUDED
 #define GUI_SYSTEM_H_INCLUDED
 
@@ -7,6 +9,21 @@
 
 #include "fonts/embedded_fonts.h"
 #include "gui_structs.h"
+
+#define GUI_ASSERT(v) do { if ((v) == 0) { \
+    GUI_DEBUG_PRINT("%s(%d): Assert '%s'\n", __FILE__, __LINE__, (# v)); \
+    for (;;) ; \
+} } while (0)
+
+#define GUI_VERIFY(v) do { if ((v) == 0) { \
+    GUI_DEBUG_PRINT("%s(%d): Verify '%s'\n", __FILE__, __LINE__, (# v)); \
+    for (;;) ; \
+} } while (0)
+
+#define GUI_MEM_ASSERT(v)   do { if (((v) == NULL)) { \
+    GUI_DEBUG_PRINT("%s: %d ('%s') - memory allocate failed!\n", __FILE__, __LINE__, (# v)); \
+    for (;;) ; \
+} } while (0)
 
 void * find_gui_obj(obj_type_t type, window_t * win, const char * name);
 void objects_state (window_t * win);

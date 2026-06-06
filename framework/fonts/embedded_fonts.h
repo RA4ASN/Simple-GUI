@@ -5,8 +5,7 @@
 
 #if WITHTOUCHGUI
 
-#include "../sdl2-render/gui_sdl2_api.h"
-#include "../gui_render_queue.h"
+#include "../gui_sdl2_api.h"
 
 // моноширинные шрифты
 typedef struct g_UB_Font32_t {
