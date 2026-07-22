@@ -3,7 +3,7 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if WITHTOUCHGUI && EMBEDDED_FONTS
 
 #include "../gui_sdl2_api.h"
 
@@ -41,6 +41,6 @@ extern gui_prop_font_t msgothic_13x16_prop;
 extern gui_mono_font_t msgothic_15x17_mono;
 extern gui_mono_font_t msgothic_11x13_mono;
 
-#endif /* WITHTOUCHGUI */
+#endif /* WITHTOUCHGUI && EMBEDDED_FONTS */
 
 #endif /* EMBEDDED_FONTS_H_INCLUDED */

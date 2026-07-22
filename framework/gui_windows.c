@@ -62,7 +62,7 @@ void open_window(window_t * win)
 	win->state = VISIBLE;
 	win->first_call = 1;
 	win->is_moving = 0;
-	win->title_align = TITLE_ALIGNMENT_LEFT;
+	win->title_align = ALIGNMENT_LEFT;
 	set_parent_window(win->window_id);
 
 }
@@ -152,8 +152,18 @@ void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay)
 void calculate_window_position(uint8_t mode, ...)
 {
 	window_t * win = get_win(get_parent_window());
-	uint16_t title_length = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
 	uint16_t xmax = 0, ymax = 0, shift_x, shift_y, x_start, y_start;
+
+    uint16_t title_length = 0;
+    if (strcmp(win->title, "")) {
+#if SDL2_FONTS
+        int tw = 0, th = 0;
+        gui_sdl2_get_text_size(win->title, gui_sdl2_get_window_title_font(), &tw, &th);
+        title_length = (uint16_t)tw;
+#else
+        title_length = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
+#endif
+    }
 
 	GUI_ASSERT(win != NULL);
 	win->size_mode = mode;
@@ -401,7 +411,7 @@ void window_set_title(const char * text)
 	strncpy(win->title, text, NAME_ARRAY_SIZE - 1);
 }
 
-void window_set_title_align(title_align_t align)
+void window_set_title_align(align_t align)
 {
 	window_t * win = get_win(get_parent_window());
 	win->title_align = align;
@@ -409,45 +419,53 @@ void window_set_title_align(title_align_t align)
 
 void draw_window(window_t * win)
 {
-	uint16_t x = win->x1;
-	uint16_t y = win->y1;
+    uint16_t x = win->x1;
+    uint16_t y = win->y1;
+    if (win->window_id == WINDOW_MAIN) return;
+    GUI_ASSERT(win->w > 0 || win->h > 0);
 
-	if (win->window_id == WINDOW_MAIN) return;
+    __gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + window_title_height) : y,
+    x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA);
 
-	GUI_ASSERT(win->w > 0 || win->h > 0);
+    // вывод заголовка окна
+    if (strcmp(win->title, ""))
+    {
+        uint16_t title_lenght = 0;
+#if SDL2_FONTS
+        int tw = 0, th = 0;
+        gui_sdl2_get_text_size(win->title, gui_sdl2_get_window_title_font(), &tw, &th);
+        title_lenght = (uint16_t)tw;
+#else
+        title_lenght = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
+#endif
 
-	__gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + window_title_height) : y,
-			x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA);
+        uint16_t xt = 0;
+        switch(win->title_align)
+        {
+        case ALIGNMENT_LEFT:
+            xt = x + window_title_indent;
+            break;
+        case ALIGNMENT_RIGHT:
+            xt = x + win->w - title_lenght - window_title_indent - (win->is_close ? window_close_button_size : 0);
+            break;
+        case ALIGNMENT_CENTER:
+            xt = x + win->w / 2 - title_lenght / 2;
+            break;
+        default:
+            GUI_DEBUG_PRINT("Title alignment value %d incorrect for window %s\n", win->title_align, win->title);
+            GUI_ASSERT(0);
+            break;
+        }
 
-	// вывод заголовка окна
-	if (strcmp(win->title, ""))
-	{
-		uint16_t title_lenght = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
-		uint16_t xt = 0;
+        __gui_draw_rect(x, y, win->w, window_title_height, GUI_WINDOWTITLECOLOR, 1);
 
-		switch(win->title_align)
-		{
-		case TITLE_ALIGNMENT_LEFT:
-			xt = x + window_title_indent;
-			break;
-
-		case TITLE_ALIGNMENT_RIGHT:
-			xt = x + win->w - title_lenght - window_title_indent - (win->is_close ? window_close_button_size : 0);
-			break;
-
-		case TITLE_ALIGNMENT_CENTER:
-			xt = x + win->w / 2 - title_lenght / 2;
-			break;
-
-		default:
-			GUI_DEBUG_PRINT("Title alignment value %d incorrect for window %s\n", win->title_align, win->title);
-			GUI_ASSERT(0);
-			break;
-		}
-
-		__gui_draw_rect(x, y, win->w, window_title_height, GUI_WINDOWTITLECOLOR, 1);
-		__gui_print_prop(xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
-	}
+#if SDL2_FONTS
+        gui_sdl2_draw_text(win->title, xt, y + 5, gui_sdl2_get_window_title_font(), GUI_COLOR_BLACK);
+#else
+        __gui_print_prop(xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
+#endif
+        // ============================================
+    }
 }
 
 #endif /* WITHTOUCHGUI */

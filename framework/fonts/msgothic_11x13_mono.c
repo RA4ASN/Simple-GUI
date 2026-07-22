@@ -32,7 +32,7 @@
 //--------------------------------------------------------------
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if WITHTOUCHGUI && EMBEDDED_FONTS
 
 #include "embedded_fonts.h"
 //--------------------------------------------------------------
@@ -150,4 +150,4 @@ gui_mono_font_t msgothic_11x13_mono = {
   13,              // Hoehe eines Zeichens  (in Pixel)
 };
 
-#endif /* WITHTOUCHGUI */
+#endif /* WITHTOUCHGUI && EMBEDDED_FONTS */

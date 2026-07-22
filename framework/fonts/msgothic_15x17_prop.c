@@ -33,7 +33,7 @@
 //--------------------------------------------------------------
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if WITHTOUCHGUI && EMBEDDED_FONTS
 
 #include "embedded_fonts.h"
 //--------------------------------------------------------------
@@ -152,4 +152,4 @@ gui_prop_font_t msgothic_15x17_prop = {
 		126,             // letztes Zeichen (Ascii-Nr)
 };
 
-#endif /* WITHTOUCHGUI && ! GUI_EXTERNAL_FONTS */
+#endif /* WITHTOUCHGUI && EMBEDDED_FONTS */

@@ -12,6 +12,10 @@
 #include "gui_sdl2_api.h"
 #include "mslist.h"
 
+#if SDL2_FONTS
+#include <SDL2/SDL_ttf.h>
+#endif
+
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
 #define IS_BUTTON_LONG_PRESS	(type == TYPE_BUTTON && action == LONG_PRESSED)
 #define IS_SLIDER_MOVE			(type == TYPE_SLIDER && action == PRESSED)
@@ -24,8 +28,6 @@
 								int32_t action;	\
 								char name[NAME_ARRAY_SIZE];		\
 								switch (get_from_wm_queue(W, & type, & action, name))
-
-#define NEED_INVALIDATION_MASK	0x80
 
 typedef enum {
 	TYPE_DUMMY,
@@ -80,12 +82,11 @@ enum {
 	WINDOW_POSITION_FULLSCREEN
 };
 
-// выравнивание заголовка окна, по умолчанию - слева
 typedef enum {
-	TITLE_ALIGNMENT_LEFT,
-	TITLE_ALIGNMENT_RIGHT,
-	TITLE_ALIGNMENT_CENTER
-} title_align_t;
+	ALIGNMENT_LEFT,
+	ALIGNMENT_RIGHT,
+	ALIGNMENT_CENTER
+} align_t;
 
 typedef enum {
 	UP,
@@ -95,24 +96,24 @@ typedef enum {
 typedef enum {
 	ALIGN_RIGHT_UP,
 	ALIGN_RIGHT_UP_MID,
+	ALIGN_RIGHT_DOWN,
 	ALIGN_LEFT_UP,
+	ALIGN_LEFT_TOP,
 	ALIGN_DOWN_LEFT,
 	ALIGN_DOWN_MID,
 	ALIGN_DOWN_RIGHT,
 } object_alignment_t;
 
 typedef enum {
-	// свойства, не требующие инвалидации кеша
 	GUI_OBJ_VISIBLE,
 	GUI_OBJ_POS_X,
 	GUI_OBJ_POS_Y,
 	GUI_OBJ_POS,
+	GUI_OBJ_ALIGN,
 	GUI_OBJ_REPEAT,
 	GUI_OBJ_INDEX,
 	GUI_OBJ_LONG_PRESS,
-
-	// свойства, при изменении которых требуется инвалидация кеша
-	GUI_OBJ_FONT = NEED_INVALIDATION_MASK + 1,
+	GUI_OBJ_FONT,
 	GUI_OBJ_TEXT,
 	GUI_OBJ_TEXT_FMT,
 	GUI_OBJ_PAYLOAD,
@@ -152,7 +153,6 @@ typedef struct {
 	uint8_t parent;
 	uint8_t visible;
 	tf_direction_t direction;
-	const gui_mono_font_t * font;
 	char name[NAME_ARRAY_SIZE];
 	uint8_t index;
 	tf_entry_t * string;
@@ -160,6 +160,11 @@ typedef struct {
 	uint16_t y1;
 	uint16_t w;
 	uint16_t h;
+#if SDL2_FONTS
+    TTF_Font* font;
+#else
+    const gui_mono_font_t * font;
+#endif
 } text_field_t;
 
 typedef struct {
@@ -192,7 +197,11 @@ typedef struct {
 	uint8_t index;
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
-	const gui_prop_font_t * font;
+#if SDL2_FONTS
+    TTF_Font* font;
+#else
+    const gui_prop_font_t * font;
+#endif
 } button_t;
 
 typedef struct {
@@ -205,12 +214,19 @@ typedef struct {
 	gui_color_t color;
 	int32_t payload;
 	uint8_t index;
-	uint8_t width;			// ширина в символах
-	uint16_t width_pix;		// ширина в пикселях
-	uint16_t height_pix;
+	uint8_t width;				// ширина bounding box в символах
+	uint16_t width_text_pix;
+	uint16_t bbox_w;			// размеры bounding box в пикселях
+	uint16_t bbox_h;
+	align_t bbox_align;			// выравнивание внутри bounding box
 	uint16_t x;
 	uint16_t y;
-	const gui_mono_font_t * font;
+	uint8_t font_size;
+#if SDL2_FONTS
+    TTF_Font* font;
+#else
+    const gui_mono_font_t * font;
+#endif
 } label_t;
 
 typedef enum  {
@@ -307,7 +323,7 @@ typedef struct {
 	uint16_t draw_y1;				// доступной для вывода графики
 	uint16_t draw_x2;
 	uint16_t draw_y2;
-	title_align_t title_align;
+	align_t title_align;
 	uint8_t size_mode;
 	uint8_t is_moving;
 	int8_t idx_bh_focus;

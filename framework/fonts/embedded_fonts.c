@@ -7,7 +7,7 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if WITHTOUCHGUI && EMBEDDED_FONTS
 
 #include "../gui_system.h"
 #include "../gui_structs.h"
@@ -199,4 +199,4 @@ void gui_print_prop(uint16_t x, uint16_t y, const char * text, const gui_prop_fo
 	gui_draw_string_glyph(xn, yn, text, NULL, font, color);
 }
 
-#endif /* WITHTOUCHGUI */
+#endif /* WITHTOUCHGUI && EMBEDDED_FONTS */

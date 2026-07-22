@@ -11,7 +11,7 @@
 
 window_t * get_win(uint8_t window_id);
 void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay);
-void window_set_title_align(title_align_t align);
+void window_set_title_align(align_t align);
 void window_set_title(const char * text);
 void enable_window_move(void);
 void close_window(uint8_t parent);

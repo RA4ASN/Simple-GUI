@@ -647,6 +647,10 @@ void gui_initialize (void)
 	InitializeListHead(& gui_objects_list);
 	gui_objects_init();
 
+#if SDL2_FONTS
+    gui_sdl2_text_init();
+#endif
+
 	open_window(get_win(WINDOW_MAIN));
 
 	gui_user_init();

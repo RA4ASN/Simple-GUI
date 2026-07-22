@@ -28,6 +28,7 @@ SDL_Renderer * sdl2_get_renderer(void);
 	)
 
 #define GUI_DEFAULTCOLOR            	0   // fully transparent color
+#define GUI_COLOR_GREEN 				GUI_TFTRGB(0x00, 0xFF, 0x00)
 #define GUI_COLOR_DARKGRAY              GUI_TFTRGB(0x80, 0x80, 0x80)
 #define GUI_COLOR_YELLOW                GUI_TFTRGB(0xFF, 0xFF, 0x00)
 #define GUI_COLOR_WHITE                 GUI_TFTRGB(0xFF, 0xFF, 0xFF)
@@ -233,9 +234,9 @@ static inline void __gui_draw_semitransparent_rect(unsigned int x1, unsigned int
 {
 	SDL_Renderer * renderer = sdl2_get_renderer();
 
-	uint8_t r = (COLORPIP_DARKGRAY >> 16) & 0xFF;
-	uint8_t g = (COLORPIP_DARKGRAY >> 8) & 0xFF;
-	uint8_t b = (COLORPIP_DARKGRAY >> 0) & 0xFF;
+	uint8_t r = (GUI_COLOR_DARKGRAY >> 16) & 0xFF;
+	uint8_t g = (GUI_COLOR_DARKGRAY >> 8) & 0xFF;
+	uint8_t b = (GUI_COLOR_DARKGRAY >> 0) & 0xFF;
 	uint8_t a = (uint8_t)alpha;
 
 	SDL_Rect rect = { .x = x1, .y = y1, .w = (x2 - x1), .h = (y2 - y1)};
@@ -246,8 +247,8 @@ static inline void __gui_draw_semitransparent_rect(unsigned int x1, unsigned int
 }
 
 static inline uint8_t __gui_get_touch_event(uint16_t * x, uint16_t * y) {
-	uint_fast16_t xx, yy, p;
-	p = board_tsc_getxy(&xx, &yy);
+	uint16_t xx, yy, p;
+	p = evdev_get_event(&xx, &yy);
 	*x = xx;
 	*y = yy;
 	return p;
