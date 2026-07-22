@@ -9,6 +9,9 @@
 
 #include "gui_structs.h"
 
+uint8_t get_commonbtn_w(void);
+uint8_t get_commonbtn_h(void);
+
 uint16_t get_label_width(const label_t * const lh);
 uint16_t get_label_height(const label_t * const lh);
 uint16_t get_label_height2(const char * name);

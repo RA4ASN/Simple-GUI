@@ -7,41 +7,42 @@
 
 #if WITHTOUCHGUI
 
-#define WITHGUIMAXX				800
-#define WITHGUIMAXY				480
-#define FOOTER_HEIGHT			(WITHGUIMAXX / 16)
+typedef struct {
+	uint16_t max_w;
+	uint16_t max_h;
+	uint8_t sliders_scale_thickness;	// ширина шкалы слайдера
+	uint8_t sliders_w;					// размеры ползунка слайдера
+	uint8_t sliders_h;					// от центра (*2)
+	uint8_t window_title_height;		// высота области заголовка окна
+	uint8_t edge_step;					// отступ от границ окна
+	uint8_t window_close_button_size;
+	uint8_t window_title_indent;		// горизонтальный отступ заголовка
+	uint8_t touch_area_enlarge;			// увеличение области вокруг элементов для упрощения попадания по мелким элементам
+	uint8_t common_btn_width;
+	uint8_t common_btn_height;
+	uint8_t footer_height;
+	uint8_t buttons_font_size;
+	uint8_t labels_font_size;
+	uint8_t win_title_font_size;
+} gui_sizes_t ;
 
-//#define GUI_TIME_PROFILER		1
-//#define DEBUG_WINDOW_CACHE	1
-//#define DEBUG_BUTTONS_CACHE	1
-//#define DEBUG_LABELS_CACHE	1
-//#define DEBUG_TFS_CACHE		1
-//#define DEBUG_SLIDERS_CACHE	1
+extern gui_sizes_t gui_sizes;
 
 enum {
-	sliders_scale_thickness = 8,// ширина шкалы слайдера
-	sliders_w = 12,				// размеры ползунка слайдера
-	sliders_h = 18,				// от центра (*2)
 	button_round_radius = 3,	// радиус закругления кнопки
-	window_title_height = 26,	// высота области заголовка окна
 	edge_step = 15,				// отступ от границ окна
-	window_close_button_size = window_title_height,
-	window_title_indent = 20,	// горизонтальный отступ заголовка
-	touch_area_enlarge = 5,		// увеличение области вокруг элементов для упрощения попадания по мелким элементам
 	autorepeat_delay = 4,		// задержка автоповтора действий
 	footer_buttons_count = 9,
 	common_btn_interval = 3,
-	common_btn_width = WITHGUIMAXX / 9 + 1 - common_btn_interval,
-	common_btn_height = FOOTER_HEIGHT - 6,
 	NAME_ARRAY_SIZE = 40,
 	MENU_ARRAY_SIZE = 50,
 	TEXT_ARRAY_SIZE = 70,
 	GUI_OBJECTS_ARRAY_SIZE = 60
 };
 
-#define COMMON_BUTTON_STYLE		common_btn_width, common_btn_height
-#define SMALL_BUTTON_STYLE		common_btn_height, common_btn_height
-#define LONG_BUTTON_STYLE		(common_btn_width + common_btn_width / 3), common_btn_height
+#define COMMON_BUTTON_STYLE		get_commonbtn_w(), get_commonbtn_h()
+#define SMALL_BUTTON_STYLE		get_commonbtn_h(), get_commonbtn_h()
+#define LONG_BUTTON_STYLE		(get_commonbtn_w() + get_commonbtn_w() / 3), get_commonbtn_h()
 
 #if EMBEDDED_FONTS
 #define BUTTONS_FONTP_DEFAULT	msgothic_15x17_prop

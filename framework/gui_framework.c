@@ -13,6 +13,7 @@ static uint8_t gui_object_count = 0;
 static button_t close_button = { 0, 0, CANCELLED, BUTTON_NON_LOCKED, 0, 0, 0, NO_PARENT_WINDOW, NON_VISIBLE, INT32_MAX, "btс_close", "", };
 static uint8_t opened_windows_count = 1;
 static uint8_t inited = 0;
+gui_sizes_t gui_sizes;
 
 /* Возврат id parent window */
 uint8_t get_parent_window(void)
@@ -525,10 +526,10 @@ void objects_state (window_t * win)
 	{
 		if (win->state)
 		{
-			close_button.x1 = win->w - window_close_button_size + 1;
+			close_button.x1 = win->w - gui_sizes.window_close_button_size + 1;
 			close_button.y1 = 1;
-			close_button.w = window_close_button_size - 3;
-			close_button.h = window_close_button_size - 3;
+			close_button.w = gui_sizes.window_close_button_size - 3;
+			close_button.h = gui_sizes.window_close_button_size - 3;
 			close_button.parent = win->window_id;
 			close_button.visible = VISIBLE;
 			close_button.state = CANCELLED;
@@ -641,9 +642,42 @@ static void slider_process(slider_t * sl)
 	gui.vector_move_y = 0;
 }
 
-/* Инициализация GUI */
-void gui_initialize (void)
+uint16_t gui_get_max_w(void)
 {
+	return gui_sizes.max_w;
+}
+
+uint16_t gui_get_max_h(void)
+{
+	return gui_sizes.max_h;
+}
+
+uint16_t gui_get_footer_h(void)
+{
+	return gui_sizes.footer_height;
+}
+
+/* Инициализация GUI */
+void gui_initialize (uint16_t screen_w, uint16_t screen_h)
+{
+	gui_sizes.max_w = screen_w;
+	gui_sizes.max_h = screen_h;
+
+	gui_sizes.sliders_scale_thickness = screen_w / 10;
+	gui_sizes.sliders_w = screen_w / 66;
+	gui_sizes.sliders_h = screen_h / 30;
+	gui_sizes.window_title_height = screen_h / 18;
+	gui_sizes.edge_step = screen_h / 32;
+	gui_sizes.window_close_button_size = screen_h / 18;
+	gui_sizes.window_title_indent = screen_w / 40;
+	gui_sizes.touch_area_enlarge = screen_w / 160;
+	gui_sizes.footer_height = screen_h / 10;
+	gui_sizes.common_btn_width = screen_w / footer_buttons_count + 1 - common_btn_interval;
+	gui_sizes.common_btn_height = gui_sizes.footer_height - (screen_h / 80);
+	gui_sizes.buttons_font_size = screen_w / 44;
+	gui_sizes.labels_font_size = screen_w / 44;
+	gui_sizes.win_title_font_size = screen_w / 50;
+
 	InitializeListHead(& gui_objects_list);
 	gui_objects_init();
 
@@ -668,10 +702,10 @@ static void update_gui_objects_list(void)
 		if (p->type == TYPE_BUTTON || p->type == TYPE_CLOSE_BUTTON)
 		{
 			button_t * bh = (button_t *) p->link;
-			p->x1 = (bh->x1 - touch_area_enlarge) < 0 ? 0 : (bh->x1 - touch_area_enlarge);
-			p->x2 = (bh->x1 + bh->w + touch_area_enlarge) > WITHGUIMAXX ? WITHGUIMAXX : (bh->x1 + bh->w + touch_area_enlarge);
-			p->y1 = (bh->y1 - touch_area_enlarge) < 0 ? 0 : (bh->y1 - touch_area_enlarge);
-			p->y2 = (bh->y1 + bh->h + touch_area_enlarge) > WITHGUIMAXY ? WITHGUIMAXY : (bh->y1 + bh->h + touch_area_enlarge);
+			p->x1 = (bh->x1 - gui_sizes.touch_area_enlarge) < 0 ? 0 : (bh->x1 - gui_sizes.touch_area_enlarge);
+			p->x2 = (bh->x1 + bh->w + gui_sizes.touch_area_enlarge) > gui_sizes.max_w ? gui_sizes.max_w : (bh->x1 + bh->w + gui_sizes.touch_area_enlarge);
+			p->y1 = (bh->y1 - gui_sizes.touch_area_enlarge) < 0 ? 0 : (bh->y1 - gui_sizes.touch_area_enlarge);
+			p->y2 = (bh->y1 + bh->h + gui_sizes.touch_area_enlarge) > gui_sizes.max_h ? gui_sizes.max_h : (bh->y1 + bh->h + gui_sizes.touch_area_enlarge);
 			p->state = bh->state;
 			p->visible = bh->visible;
 			p->is_trackable = 0;
@@ -681,10 +715,10 @@ static void update_gui_objects_list(void)
 		else if (p->type == TYPE_LABEL)
 		{
 			label_t * lh = (label_t *) p->link;
-			p->x1 = (lh->x - touch_area_enlarge) < 0 ? 0 : (lh->x - touch_area_enlarge);
-			p->x2 = (lh->x + get_label_width(lh) + touch_area_enlarge) > WITHGUIMAXX ? WITHGUIMAXX : (lh->x + get_label_width(lh) + touch_area_enlarge);
-			p->y1 = (lh->y - get_label_height(lh) - touch_area_enlarge) < 0 ? 0 : (lh->y - get_label_height(lh) - touch_area_enlarge);
-			p->y2 = (lh->y + get_label_height(lh) * 2 + touch_area_enlarge) > WITHGUIMAXY ? WITHGUIMAXY : (lh->y + get_label_height(lh) * 2 + touch_area_enlarge);
+			p->x1 = (lh->x - gui_sizes.touch_area_enlarge) < 0 ? 0 : (lh->x - gui_sizes.touch_area_enlarge);
+			p->x2 = (lh->x + get_label_width(lh) + gui_sizes.touch_area_enlarge) > gui_sizes.max_w ? gui_sizes.max_w : (lh->x + get_label_width(lh) + gui_sizes.touch_area_enlarge);
+			p->y1 = (lh->y - get_label_height(lh) - gui_sizes.touch_area_enlarge) < 0 ? 0 : (lh->y - get_label_height(lh) - gui_sizes.touch_area_enlarge);
+			p->y2 = (lh->y + get_label_height(lh) * 2 + gui_sizes.touch_area_enlarge) > gui_sizes.max_h ? gui_sizes.max_h : (lh->y + get_label_height(lh) * 2 + gui_sizes.touch_area_enlarge);
 			p->state = lh->state;
 			p->visible = lh->visible;
 			p->is_trackable = lh->is_trackable;
@@ -694,10 +728,10 @@ static void update_gui_objects_list(void)
 	    else if (p->type == TYPE_SLIDER)
 	    {
 	        slider_t * sh = (slider_t *) p->link;
-	        p->x1 = (sh->x - touch_area_enlarge) < 0 ? 0 : (sh->x - touch_area_enlarge);
-	        p->x2 = (sh->x + sh->width + touch_area_enlarge) > WITHGUIMAXX ? WITHGUIMAXX : (sh->x + sh->width + touch_area_enlarge);
-	        p->y1 = (sh->y - touch_area_enlarge) < 0 ? 0 : (sh->y - touch_area_enlarge);
-	        p->y2 = (sh->y + sh->height + touch_area_enlarge) > WITHGUIMAXY ? WITHGUIMAXY : (sh->y + sh->height + touch_area_enlarge);
+	        p->x1 = (sh->x - gui_sizes.touch_area_enlarge) < 0 ? 0 : (sh->x - gui_sizes.touch_area_enlarge);
+	        p->x2 = (sh->x + sh->width + gui_sizes.touch_area_enlarge) > gui_sizes.max_w ? gui_sizes.max_w : (sh->x + sh->width + gui_sizes.touch_area_enlarge);
+	        p->y1 = (sh->y - gui_sizes.touch_area_enlarge) < 0 ? 0 : (sh->y - gui_sizes.touch_area_enlarge);
+	        p->y2 = (sh->y + sh->height + gui_sizes.touch_area_enlarge) > gui_sizes.max_h ? gui_sizes.max_h : (sh->y + sh->height + gui_sizes.touch_area_enlarge);
 
 	        p->state = sh->state;
 	        p->visible = sh->visible;
@@ -709,9 +743,9 @@ static void update_gui_objects_list(void)
 		{
 			touch_area_t * ta = (touch_area_t *) p->link;
 			p->x1 = (ta->x1) < 0 ? 0 : (ta->x1);
-			p->x2 = (ta->x1 + ta->w) > WITHGUIMAXX ? WITHGUIMAXX : (ta->x1 + ta->w);
+			p->x2 = (ta->x1 + ta->w) > gui_sizes.max_w ? gui_sizes.max_w : (ta->x1 + ta->w);
 			p->y1 = (ta->y1) < 0 ? 0 : (ta->y1);
-			p->y2 = (ta->y1 + ta->h) > WITHGUIMAXY ? WITHGUIMAXY : (ta->y1 + ta->h);
+			p->y2 = (ta->y1 + ta->h) > gui_sizes.max_h ? gui_sizes.max_h : (ta->y1 + ta->h);
 			p->state = ta->state;
 			p->visible = ta->visible;
 			p->is_trackable = ta->is_trackable;
@@ -722,9 +756,9 @@ static void update_gui_objects_list(void)
 		{
 			text_field_t * tf = (text_field_t *) p->link;
 			p->x1 = (tf->x1) < 0 ? 0 : (tf->x1);
-			p->x2 = (tf->x1 + tf->w) > WITHGUIMAXX ? WITHGUIMAXX : (tf->x1 + tf->w);
+			p->x2 = (tf->x1 + tf->w) > gui_sizes.max_w ? gui_sizes.max_w : (tf->x1 + tf->w);
 			p->y1 = (tf->y1) < 0 ? 0 : (tf->y1);
-			p->y2 = (tf->y1 + tf->h) > WITHGUIMAXY ? WITHGUIMAXY : (tf->y1 + tf->h);
+			p->y2 = (tf->y1 + tf->h) > gui_sizes.max_h ? gui_sizes.max_h : (tf->y1 + tf->h);
 			p->state = tf->state;
 			p->visible = tf->visible;
 			p->is_trackable = 0;

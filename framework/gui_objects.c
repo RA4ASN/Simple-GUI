@@ -20,12 +20,15 @@ const gui_color_t btn_bg_colors[BG_COUNT] =
 				GUI_COLOR_BUTTON_DISABLED,
 		};
 
-static btn_bg_t btn_bg[] = {
-	{ COMMON_BUTTON_STYLE, },
-	{ SMALL_BUTTON_STYLE, },
-	{ LONG_BUTTON_STYLE, },
-};
-enum { BG_DEF_COUNT = ARRAY_SIZE(btn_bg) };
+uint8_t get_commonbtn_w(void)
+{
+	return gui_sizes.common_btn_width;
+}
+
+uint8_t get_commonbtn_h(void)
+{
+	return gui_sizes.common_btn_height;
+}
 
 // *************** Labels ***************
 
@@ -190,8 +193,8 @@ void textfield_update_size(text_field_t * tf)
     tf->h = tf->font->height * tf->h_str;
 #endif
 
-    GUI_ASSERT(tf->w < WITHGUIMAXX);
-    GUI_ASSERT(tf->h < WITHGUIMAXY - window_title_height);
+    GUI_ASSERT(tf->w < gui_sizes.max_w);
+    GUI_ASSERT(tf->h < gui_sizes.max_h - gui_sizes.window_title_height);
 }
 
 /* Добавить строку в текстовое поле */
@@ -261,18 +264,18 @@ static void slider_update(slider_t * sl, uint16_t x, uint16_t y)
 	if (sl->orientation == ORIENTATION_HORIZONTAL)
 	{
 		sl->value_p = sl->scale_x + sl->scale_size * sl->value / 100;
-		sl->x1_p = sl->value_p - sliders_w;
+		sl->x1_p = sl->value_p - gui_sizes.sliders_w;
 		sl->y1_p = 0;
-		sl->x2_p = sl->value_p + sliders_w;
-		sl->y2_p = sliders_h * 2;
+		sl->x2_p = sl->value_p + gui_sizes.sliders_w;
+		sl->y2_p = gui_sizes.sliders_h * 2;
 	}
 	else if (sl->orientation == ORIENTATION_VERTICAL)
 	{
 		sl->value_p = sl->scale_y + sl->scale_size * sl->value / 100;
 		sl->x1_p = 0;
-		sl->y1_p = sl->value_p - sliders_w;
-		sl->x2_p = sliders_h * 2;
-		sl->y2_p = sl->value_p + sliders_w;
+		sl->y1_p = sl->value_p - gui_sizes.sliders_w;
+		sl->x2_p = gui_sizes.sliders_h * 2;
+		sl->y2_p = sl->value_p + gui_sizes.sliders_w;
 	}
 }
 
@@ -288,8 +291,8 @@ void draw_slider(slider_t * sl)
 	if (sl->orientation == ORIENTATION_HORIZONTAL)
 	{
 		// scale
-		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sl->scale_size, sliders_scale_thickness, GUI_COLOR_WHITE, 0);
-		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, sliders_scale_thickness - 2, GUI_COLOR_BLACK, 1);
+		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sl->scale_size, gui_sizes.sliders_scale_thickness, GUI_COLOR_WHITE, 0);
+		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sl->scale_size - 2, gui_sizes.sliders_scale_thickness - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
 		__gui_draw_rect(x + sl->x1_p, y + sl->y1_p, sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p,
@@ -300,8 +303,8 @@ void draw_slider(slider_t * sl)
 	else if (sl->orientation == ORIENTATION_VERTICAL)
 	{
 		// scale
-		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, sliders_scale_thickness, sl->scale_size, GUI_COLOR_WHITE, 0);
-		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, sliders_scale_thickness - 2, sl->scale_size - 2, GUI_COLOR_BLACK, 1);
+		__gui_draw_rect(x + sl->scale_x, y + sl->scale_y, gui_sizes.sliders_scale_thickness, sl->scale_size, GUI_COLOR_WHITE, 0);
+		__gui_draw_rect(x + sl->scale_x + 1, y + sl->scale_y + 1, gui_sizes.sliders_scale_thickness - 2, sl->scale_size - 2, GUI_COLOR_BLACK, 1);
 
 		// handle
 		__gui_draw_rect(x + sl->x1_p, y + sl->y1_p,  sl->x2_p - sl->x1_p, sl->y2_p - sl->y1_p,
@@ -378,7 +381,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		strncpy(lh->name, obj_name, NAME_ARRAY_SIZE);
 		lh->width = va_arg(arg, uint32_t);
 		memset(lh->text, '*', lh->width);		// для совместимости, потом убрать
-		lh->font_size = LABEL_FONT_SIZE;
+		lh->font_size = gui_sizes.labels_font_size;
 		lh->bbox_align = ALIGNMENT_LEFT;
 
 #if SDL2_FONTS
@@ -509,18 +512,18 @@ uint8_t gui_obj_create(const char * name, ...)
 		if (sh->orientation)	// ORIENTATION_HORIZONTAL
 		{
 			sh->width = sh->size;
-			sh->height = sliders_h * 2;
-			sh->scale_x = sliders_w;
-			sh->scale_y = sliders_h - sliders_scale_thickness / 2;
-			sh->scale_size = sh->size - sliders_w * 2;
+			sh->height = gui_sizes.sliders_h * 2;
+			sh->scale_x = gui_sizes.sliders_w;
+			sh->scale_y = gui_sizes.sliders_h - gui_sizes.sliders_scale_thickness / 2;
+			sh->scale_size = sh->size - gui_sizes.sliders_w * 2;
 		}
 		else					// ORIENTATION_VERTICAL
 		{
-			sh->width = sliders_h * 2;
+			sh->width = gui_sizes.sliders_h * 2;
 			sh->height = sh->size;
-			sh->scale_x = sliders_h - sliders_scale_thickness / 2;
-			sh->scale_y = sliders_w;
-			sh->scale_size = sh->size - sliders_h * 2;
+			sh->scale_x = gui_sizes.sliders_h - gui_sizes.sliders_scale_thickness / 2;
+			sh->scale_y = gui_sizes.sliders_w;
+			sh->scale_size = sh->size - gui_sizes.sliders_h * 2;
 		}
 
 		idx = win->sh_count;

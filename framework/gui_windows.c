@@ -136,7 +136,7 @@ void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay)
 	GUI_ASSERT(win != NULL);
 
 	// защита от переполнения экранных координат
-	if (win->x1 + ax < 0 || win->x1 + win->w + ax >= WITHGUIMAXX || win->y1 + ay < 0 || win->y1 + win->h + ay >= WITHGUIMAXY - FOOTER_HEIGHT)
+	if (win->x1 + ax < 0 || win->x1 + win->w + ax >= gui_sizes.max_w || win->y1 + ay < 0 || win->y1 + win->h + ay >= gui_sizes.max_h - gui_sizes.footer_height)
 		return;
 
 	win->x1 += ax;
@@ -153,6 +153,11 @@ void calculate_window_position(uint8_t mode, ...)
 {
 	window_t * win = get_win(get_parent_window());
 	uint16_t xmax = 0, ymax = 0, shift_x, shift_y, x_start, y_start;
+
+	uint16_t align_left_x = gui_sizes.max_w / 4;
+	uint16_t align_center_x = gui_sizes.max_w / 2;
+	uint16_t align_right_x = align_left_x + align_center_x;
+	uint16_t align_y = gui_sizes.max_h / 2 - gui_sizes.footer_height / 2;
 
     uint16_t title_length = 0;
     if (strcmp(win->title, "")) {
@@ -200,8 +205,8 @@ void calculate_window_position(uint8_t mode, ...)
 					const button_t * bh = & win->bh_ptr[i];
 					xmax = (xmax > bh->x1 + bh->w) ? xmax : (bh->x1 + bh->w);
 					ymax = (ymax > bh->y1 + bh->h) ? ymax : (bh->y1 + bh->h);
-					GUI_ASSERT(xmax < WITHGUIMAXX);
-					GUI_ASSERT(ymax < WITHGUIMAXY);
+					GUI_ASSERT(xmax < gui_sizes.max_w);
+					GUI_ASSERT(ymax < gui_sizes.max_h);
 				}
 			}
 
@@ -212,8 +217,8 @@ void calculate_window_position(uint8_t mode, ...)
 					const label_t * lh = & win->lh_ptr[i];
 					xmax = (xmax > lh->x + get_label_width(lh)) ? xmax : (lh->x + get_label_width(lh));
 					ymax = (ymax > lh->y + get_label_height(lh)) ? ymax : (lh->y + get_label_height(lh));
-					GUI_ASSERT(xmax < WITHGUIMAXX);
-					GUI_ASSERT(ymax < WITHGUIMAXY);
+					GUI_ASSERT(xmax < gui_sizes.max_w);
+					GUI_ASSERT(ymax < gui_sizes.max_h);
 				}
 			}
 
@@ -224,8 +229,8 @@ void calculate_window_position(uint8_t mode, ...)
 					const text_field_t * tf = & win->tf_ptr[i];
 					xmax = (xmax > tf->x1 + tf->w) ? xmax : (tf->x1 + tf->w);
 					ymax = (ymax > tf->y1 + tf->h) ? ymax : (tf->y1 + tf->h);
-					GUI_ASSERT(xmax < WITHGUIMAXX);
-					GUI_ASSERT(ymax < WITHGUIMAXY);
+					GUI_ASSERT(xmax < gui_sizes.max_w);
+					GUI_ASSERT(ymax < gui_sizes.max_h);
 				}
 			}
 
@@ -236,16 +241,16 @@ void calculate_window_position(uint8_t mode, ...)
 					const slider_t * sh = & win->sh_ptr[i];
 					if (sh->orientation)	// ORIENTATION_HORIZONTAL
 					{
-						xmax = (xmax > sh->x + sh->size + sliders_w) ? xmax : (sh->x + sh->size + sliders_w);
-						ymax = (ymax > sh->y + sliders_h * 2) ? ymax : (sh->y + sliders_h * 2);
+						xmax = (xmax > sh->x + sh->size + gui_sizes.sliders_w) ? xmax : (sh->x + sh->size + gui_sizes.sliders_w);
+						ymax = (ymax > sh->y + gui_sizes.sliders_h * 2) ? ymax : (sh->y + gui_sizes.sliders_h * 2);
 					}
 					else					// ORIENTATION_VERTICAL
 					{
-						xmax = (xmax > sh->x + sliders_w * 2) ? xmax : (sh->x + sliders_w * 2);
-						ymax = (ymax > sh->y + sh->size + sliders_h) ? ymax : (sh->y + sh->size + sliders_h);
+						xmax = (xmax > sh->x + gui_sizes.sliders_w * 2) ? xmax : (sh->x + gui_sizes.sliders_w * 2);
+						ymax = (ymax > sh->y + sh->size + gui_sizes.sliders_h) ? ymax : (sh->y + sh->size + gui_sizes.sliders_h);
 					}
-					GUI_ASSERT(xmax < WITHGUIMAXX);
-					GUI_ASSERT(ymax < WITHGUIMAXY);
+					GUI_ASSERT(xmax < gui_sizes.max_w);
+					GUI_ASSERT(ymax < gui_sizes.max_h);
 				}
 			}
 		}
@@ -257,7 +262,7 @@ void calculate_window_position(uint8_t mode, ...)
 	}
 
 	shift_x = edge_step;
-	shift_y = (title_length ? window_title_height : 0) + edge_step;
+	shift_y = (title_length ? gui_sizes.window_title_height : 0) + edge_step;
 
 	// Выравнивание массива оконных элементов по центру окна
 	if (win->window_id != WINDOW_MAIN)
@@ -269,8 +274,8 @@ void calculate_window_position(uint8_t mode, ...)
 				button_t * bh = & win->bh_ptr[i];
 				bh->x1 += shift_x;
 				bh->y1 += shift_y;
-				GUI_ASSERT(bh->x1 + bh->w < WITHGUIMAXX);
-				GUI_ASSERT(bh->y1 + bh->h < WITHGUIMAXY);
+				GUI_ASSERT(bh->x1 + bh->w < gui_sizes.max_w);
+				GUI_ASSERT(bh->y1 + bh->h < gui_sizes.max_h);
 			}
 		}
 
@@ -281,8 +286,8 @@ void calculate_window_position(uint8_t mode, ...)
 				label_t * lh = & win->lh_ptr[i];
 				lh->x += shift_x;
 				lh->y += shift_y;
-				GUI_ASSERT(lh->x + get_label_width(lh) < WITHGUIMAXX);
-				GUI_ASSERT(lh->y + get_label_height(lh) < WITHGUIMAXY);
+				GUI_ASSERT(lh->x + get_label_width(lh) < gui_sizes.max_w);
+				GUI_ASSERT(lh->y + get_label_height(lh) < gui_sizes.max_h);
 			}
 		}
 
@@ -293,8 +298,8 @@ void calculate_window_position(uint8_t mode, ...)
 				text_field_t * tf = & win->tf_ptr[i];
 				tf->x1 += shift_x;
 				tf->y1 += shift_y;
-				GUI_ASSERT(tf->x1 + tf->w < WITHGUIMAXX);
-				GUI_ASSERT(tf->y1 + tf->h < WITHGUIMAXY);
+				GUI_ASSERT(tf->x1 + tf->w < gui_sizes.max_w);
+				GUI_ASSERT(tf->y1 + tf->h < gui_sizes.max_h);
 			}
 		}
 
@@ -305,8 +310,8 @@ void calculate_window_position(uint8_t mode, ...)
 				touch_area_t * ta = & win->ta_ptr[i];
 				ta->x1 += shift_x;
 				ta->y1 += shift_y;
-				GUI_ASSERT(ta->x1 + ta->w < WITHGUIMAXX);
-				GUI_ASSERT(ta->y1 + ta->h < WITHGUIMAXY);
+				GUI_ASSERT(ta->x1 + ta->w < gui_sizes.max_w);
+				GUI_ASSERT(ta->y1 + ta->h < gui_sizes.max_h);
 			}
 		}
 
@@ -317,8 +322,8 @@ void calculate_window_position(uint8_t mode, ...)
 				slider_t * sh = & win->sh_ptr[i];
 				sh->x += shift_x;
 				sh->y += shift_y;
-				GUI_ASSERT(sh->x < WITHGUIMAXX);
-				GUI_ASSERT(sh->y < WITHGUIMAXY);
+				GUI_ASSERT(sh->x < gui_sizes.max_w);
+				GUI_ASSERT(sh->y < gui_sizes.max_h);
 			}
 		}
 	}
@@ -330,8 +335,8 @@ void calculate_window_position(uint8_t mode, ...)
 
 		win->x1 = 0;
 		win->y1 = 0;
-		win->w = WITHGUIMAXX - 1;
-		win->h = WITHGUIMAXY - FOOTER_HEIGHT - 1;
+		win->w = gui_sizes.max_w - 1;
+		win->h = gui_sizes.max_h - gui_sizes.footer_height - 1;
 	}
 	else if (mode == WINDOW_POSITION_MANUAL_POSITION)
 	{
@@ -339,43 +344,43 @@ void calculate_window_position(uint8_t mode, ...)
 		win->y1 = y_start;
 		win->w = xmax > title_length ? (xmax + edge_step * 2) : (title_length + edge_step * 2);
 		win->h = ymax + shift_y + edge_step;
-		if (win->x1 + win->w >= WITHGUIMAXX)
-			win->x1 = WITHGUIMAXX - win->w - 1;
+		if (win->x1 + win->w >= gui_sizes.max_w)
+			win->x1 = gui_sizes.max_w - win->w - 1;
 
-		GUI_ASSERT(win->x1 + win->w < WITHGUIMAXX);
-		GUI_ASSERT(win->y1 + win->h < WITHGUIMAXY);
+		GUI_ASSERT(win->x1 + win->w < gui_sizes.max_w);
+		GUI_ASSERT(win->y1 + win->h < gui_sizes.max_h);
 	}
 	else
 	{
 		win->w = xmax > title_length ? (xmax + edge_step * 2) : (title_length + edge_step * 2);
-		win->w = (win->is_close && win->w < title_length + window_close_button_size * 2) ? (win->w + window_close_button_size) : win->w;
+		win->w = (win->is_close && win->w < title_length + gui_sizes.window_close_button_size * 2) ? (win->w + gui_sizes.window_close_button_size) : win->w;
 		win->h = ymax + shift_y + edge_step;
-		win->y1 = ALIGN_Y - win->h / 2;
+		win->y1 = align_y - win->h / 2;
 
 		switch (win->align_mode)
 		{
 		case ALIGN_LEFT_X:
-			if (ALIGN_LEFT_X - win->w / 2 < 0)
+			if (align_left_x - win->w / 2 < 0)
 				win->x1 = 0;
 			else
-				win->x1 = ALIGN_LEFT_X - win->w / 2;
+				win->x1 = align_left_x - win->w / 2;
 			break;
 
 		case ALIGN_RIGHT_X:
-			if (ALIGN_RIGHT_X + win->w / 2 > WITHGUIMAXX)
-				win->x1 = WITHGUIMAXX - win->w;
+			if (align_right_x + win->w / 2 > gui_sizes.max_w)
+				win->x1 = gui_sizes.max_w - win->w;
 			else
-				win->x1 = ALIGN_RIGHT_X - win->w / 2;
+				win->x1 = align_right_x - win->w / 2;
 			break;
 
 		case ALIGN_CENTER_X:
 		default:
-			win->x1 = ALIGN_CENTER_X - win->w / 2;
+			win->x1 = align_center_x - win->w / 2;
 			break;
 		}
 
-		GUI_ASSERT(win->x1 + win->w < WITHGUIMAXX);
-		GUI_ASSERT(win->y1 + win->h < WITHGUIMAXY);
+		GUI_ASSERT(win->x1 + win->w < gui_sizes.max_w);
+		GUI_ASSERT(win->y1 + win->h < gui_sizes.max_h);
 	}
 
 	if (win->window_id == WINDOW_MAIN)	// для главного окна рисование без отступов
@@ -388,14 +393,14 @@ void calculate_window_position(uint8_t mode, ...)
 	else
 	{
 		win->draw_x1 = win->x1 + edge_step;
-		win->draw_y1 = win->y1 + edge_step + (title_length ? window_title_height : 0);
+		win->draw_y1 = win->y1 + edge_step + (title_length ? gui_sizes.window_title_height : 0);
 		win->draw_x2 = win->x1 + win->w - edge_step;
 		win->draw_y2 = win->y1 + win->h - edge_step;
 	}
 
 	if (win->is_moving)
 	{
-		gui_obj_create("ta_winmove", 0, 0, win->w - window_close_button_size, window_title_height, 1);
+		gui_obj_create("ta_winmove", 0, 0, win->w - gui_sizes.window_close_button_size, gui_sizes.window_title_height, 1);
 		touch_area_t * tm = (touch_area_t *) find_gui_obj(TYPE_TOUCH_AREA, win, "ta_winmove");
 		tm->visible = VISIBLE;
 		tm->state = CANCELLED;
@@ -424,7 +429,7 @@ void draw_window(window_t * win)
     if (win->window_id == WINDOW_MAIN) return;
     GUI_ASSERT(win->w > 0 || win->h > 0);
 
-    __gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + window_title_height) : y,
+    __gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + gui_sizes.window_title_height) : y,
     x + win->w - 1, y + win->h - 1, DEFAULT_ALPHA);
 
     // вывод заголовка окна
@@ -443,10 +448,10 @@ void draw_window(window_t * win)
         switch(win->title_align)
         {
         case ALIGNMENT_LEFT:
-            xt = x + window_title_indent;
+            xt = x + gui_sizes.window_title_indent;
             break;
         case ALIGNMENT_RIGHT:
-            xt = x + win->w - title_lenght - window_title_indent - (win->is_close ? window_close_button_size : 0);
+            xt = x + win->w - title_lenght - gui_sizes.window_title_indent - (win->is_close ? gui_sizes.window_close_button_size : 0);
             break;
         case ALIGNMENT_CENTER:
             xt = x + win->w / 2 - title_lenght / 2;
@@ -457,7 +462,7 @@ void draw_window(window_t * win)
             break;
         }
 
-        __gui_draw_rect(x, y, win->w, window_title_height, GUI_WINDOWTITLECOLOR, 1);
+        __gui_draw_rect(x, y, win->w, gui_sizes.window_title_height, GUI_WINDOWTITLECOLOR, 1);
 
 #if SDL2_FONTS
         gui_sdl2_draw_text(win->title, xt, y + 5, gui_sdl2_get_window_title_font(), GUI_COLOR_BLACK);

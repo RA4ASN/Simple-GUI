@@ -260,11 +260,10 @@ typedef struct {
 } slider_t;
 
 typedef enum {
-	ALIGN_LEFT_X 	= WITHGUIMAXX / 4,					// вертикальное выравнивание по центру левой половины экрана
-	ALIGN_CENTER_X 	= WITHGUIMAXX / 2,					// вертикальное выравнивание по центру экрана
-	ALIGN_RIGHT_X 	= ALIGN_LEFT_X + ALIGN_CENTER_X,	// вертикальное выравнивание по центру правой половины экрана
-	ALIGN_MANUAL 	= 0,								// ручное указание координат
-	ALIGN_Y 	= WITHGUIMAXY / 2 - FOOTER_HEIGHT / 2	// горизонтальное выравнивание всегда по центру экрана
+	ALIGN_LEFT_X,					// вертикальное выравнивание по центру левой половины экрана
+	ALIGN_CENTER_X,					// вертикальное выравнивание по центру экрана
+	ALIGN_RIGHT_X,					// вертикальное выравнивание по центру правой половины экрана
+	ALIGN_MANUAL,					// ручное указание координат
 } window_align_t;
 
 enum {

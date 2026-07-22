@@ -56,15 +56,15 @@ void gui_sdl2_text_init(void)
     TTF_Init();
 
     if (!btn_font) {
-        btn_font = TTF_OpenFont(BTN_FONT_PATH, BTN_FONT_SIZE);
+        btn_font = TTF_OpenFont(BTN_FONT_PATH, gui_sizes.buttons_font_size);
         if (!btn_font) printf("[GUI SDL2] Failed to load button font %s: %s\n", BTN_FONT_PATH, TTF_GetError());
     }
     if (!label_font) {
-        label_font = TTF_OpenFont(LABEL_FONT_PATH, LABEL_FONT_SIZE);
+        label_font = TTF_OpenFont(LABEL_FONT_PATH, gui_sizes.labels_font_size);
         if (!label_font) printf("[GUI SDL2] Failed to load label font %s: %s\n", LABEL_FONT_PATH, TTF_GetError());
     }
     if (!title_font) {
-        title_font = TTF_OpenFont(WINDOW_TITLE_FONT_PATH, WINDOW_TITLE_FONT_SIZE);
+        title_font = TTF_OpenFont(WINDOW_TITLE_FONT_PATH, gui_sizes.win_title_font_size);
         if (!title_font) printf("[GUI SDL2] Failed to load title font %s: %s\n", WINDOW_TITLE_FONT_PATH, TTF_GetError());
     }
     memset(size_cache, 0, sizeof(size_cache));

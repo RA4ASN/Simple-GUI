@@ -9,7 +9,7 @@ extern "C" {
 
 #if WITHTOUCHGUI
 
-void gui_initialize(void);
+void gui_initialize (uint16_t screen_w, uint16_t screen_h);
 void gui_put_keyb_code(uint8_t kbch);
 void gui_set_encoder2_rotate(int16_t rotate);
 void gui_update(void);
