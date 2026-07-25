@@ -1,7 +1,7 @@
 // Simple GUI от RA4ASN
 
-#ifndef UTILS_H_INCLUDED
-#define UTILS_H_INCLUDED
+#ifndef _gui_utils_h
+#define _gui_utils_h
 
 #include "gui_user_include.h"
 
@@ -11,4 +11,4 @@ void remove_end_line_spaces(char * str);
 const char * remove_start_line_spaces(const char * str);
 int snormalize(int raw, int rawmin, int rawmax, int range);
 
-#endif /* UTILS_H_INCLUDED */
+#endif /* _gui_utils_h */

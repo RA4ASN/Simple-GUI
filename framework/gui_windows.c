@@ -99,7 +99,6 @@ void close_window(uint8_t parent_action) // 0 - не открывать parent w
 	{
 		window_t * win = get_win(pwin);
 		win->state = NON_VISIBLE;
-		objects_state(win);
 
 		if (put_to_wm_queue(win, WM_MESSAGE_CLOSE))
 			win->onVisibleProcess();
@@ -147,8 +146,19 @@ void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay)
 	win->draw_y2 += ay;
 }
 
-/* Расчет экранных координат окна */
-/* при mode = WINDOW_POSITION_MANUAL_SIZE в качестве необязательных параметров передать xmax и ymax */
+// Вариабельные аргументы зависят от значения 'mode'.
+//
+// WINDOW_POSITION_MANUAL_SIZE:       int xmax, int ymax
+//                                    xmax, ymax - явно заданные максимальные координаты
+//                                                 содержимого окна (правый/нижний край)
+// WINDOW_POSITION_MANUAL_POSITION:   int x_start, int y_start
+//                                    x_start, y_start - явно заданный левый верхний угол окна
+// WINDOW_POSITION_FULLSCREEN:        (нет вариабельных аргументов)
+// WINDOW_POSITION_AUTO:              (нет вариабельных аргументов; размеры окна выводятся
+//                                     автоматически из габаритов созданных в нём объектов)
+//
+// Примечание: MANUAL_POSITION дополнительно использует xmax/ymax, вычисленные по объектам
+// окна (как в AUTO), но левый верхний угол берёт из varargs; FULLSCREEN игнорирует и то, и другое.
 void calculate_window_position(uint8_t mode, ...)
 {
 	window_t * win = get_win(get_parent_window());
@@ -402,8 +412,29 @@ void calculate_window_position(uint8_t mode, ...)
 		tm->state = CANCELLED;
 	}
 
+	// валидация несовместимых флагов кнопок (раньше делалось в objects_state)
+	for (uint8_t i = 0; i < win->bh_count; i++)
+	{
+		button_t * bh = & win->bh_ptr[i];
+		if (bh->is_long_press && bh->is_repeating)
+		{
+			GUI_DEBUG_PRINT("ERROR: invalid combination of properties 'is_long_press' and 'is_repeating' on button %s\n", bh->name);
+			GUI_ASSERT(0);
+		}
+	}
+	// инициализация системной кнопки закрытия окна (теперь поле окна, без глобального состояния)
+	if (win->is_close)
+	{
+		win->close_button.x1 = win->w - gui_sizes.window_close_button_size + 1;
+		win->close_button.y1 = 1;
+		win->close_button.w = gui_sizes.window_close_button_size - 3;
+		win->close_button.h = gui_sizes.window_close_button_size - 3;
+		win->close_button.parent = win->window_id;
+		win->close_button.visible = VISIBLE;
+		win->close_button.state = CANCELLED;
+	}
+
 	//GUI_DEBUG_PRINT("%d %d %d %d\n", win->x1, win->y1, win->h, win->w);
-	objects_state(win);
 }
 
 void window_set_title(const char * text)

@@ -1,12 +1,9 @@
 // Simple GUI от RA4ASN
 
-#ifndef GUI_OBJECTS_H_INCLUDED
-#define GUI_OBJECTS_H_INCLUDED
+#ifndef _gui_objects_h
+#define _gui_objects_h
 
 #include "gui_user_include.h"
-
-#if WITHTOUCHGUI
-
 #include "gui_structs.h"
 
 uint8_t get_commonbtn_w(void);
@@ -40,5 +37,4 @@ void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uin
 void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, uint8_t interval);
 char * get_obj_name_by_idx(obj_type_t type, uint8_t idx);
 
-#endif /* WITHTOUCHGUI */
-#endif /* GUI_OBJECTS_H_INCLUDED */
+#endif /* _gui_objects_h */

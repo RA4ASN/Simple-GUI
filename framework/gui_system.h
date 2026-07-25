@@ -1,31 +1,26 @@
 // Simple GUI от RA4ASN
-
-#ifndef GUI_SYSTEM_H_INCLUDED
-#define GUI_SYSTEM_H_INCLUDED
+#ifndef _gui_system_h
+#define _gui_system_h
 
 #include "gui_user_include.h"
-
-#if WITHTOUCHGUI
-
 #include "gui_structs.h"
 
 #define GUI_ASSERT(v) do { if ((v) == 0) { \
-    GUI_DEBUG_PRINT("%s(%d): Assert '%s'\n", __FILE__, __LINE__, (# v)); \
-    for (;;) ; \
+	GUI_DEBUG_PRINT("%s(%d): Assert '%s'\n", __FILE__, __LINE__, (# v)); \
+	for (;;) ; \
 } } while (0)
 
 #define GUI_VERIFY(v) do { if ((v) == 0) { \
-    GUI_DEBUG_PRINT("%s(%d): Verify '%s'\n", __FILE__, __LINE__, (# v)); \
-    for (;;) ; \
+	GUI_DEBUG_PRINT("%s(%d): Verify '%s'\n", __FILE__, __LINE__, (# v)); \
+	for (;;) ; \
 } } while (0)
 
 #define GUI_MEM_ASSERT(v)   do { if (((v) == NULL)) { \
-    GUI_DEBUG_PRINT("%s: %d ('%s') - memory allocate failed!\n", __FILE__, __LINE__, (# v)); \
-    for (;;) ; \
+	GUI_DEBUG_PRINT("%s: %d ('%s') - memory allocate failed!\n", __FILE__, __LINE__, (# v)); \
+	for (;;) ; \
 } } while (0)
 
 void * find_gui_obj(obj_type_t type, window_t * win, const char * name);
-void objects_state (window_t * win);
 uint8_t get_parent_window(void);
 uint8_t get_current_drawing_window(void);
 void set_parent_window(uint8_t p);
@@ -49,5 +44,4 @@ void gui_drawDashedRectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t he
 
 void process_gui(void);
 
-#endif /* WITHTOUCHGUI */
-#endif /* GUI_USER_H_INCLUDED */
+#endif /* _gui_system_h */

@@ -1,6 +1,6 @@
 // framework/gui_sdl2_text.h
-#ifndef GUI_SDL2_TEXT_H_INCLUDED
-#define GUI_SDL2_TEXT_H_INCLUDED
+#ifndef _gui_sdl2_text_h
+#define _gui_sdl2_text_h
 
 #include "gui_user_include.h"
 
@@ -30,4 +30,4 @@ void gui_sdl2_invalidate_font_cache(TTF_Font* font);
 
 void gui_sdl2_invalidate_text(const char* text, TTF_Font* font);
 
-#endif /* GUI_SDL2_TEXT_H_INCLUDED */
+#endif /* _gui_sdl2_text_h */

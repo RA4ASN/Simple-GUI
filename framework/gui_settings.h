@@ -1,7 +1,7 @@
 // Simple GUI от RA4ASN
 
-#ifndef GUI_SETTINGS_H_INCLUDED
-#define GUI_SETTINGS_H_INCLUDED
+#ifndef _gui_settings_h
+#define _gui_settings_h
 
 #include "gui_user_include.h"
 
@@ -52,8 +52,7 @@ enum {
 	common_btn_interval = 3,
 	NAME_ARRAY_SIZE = 40,
 	MENU_ARRAY_SIZE = 50,
-	TEXT_ARRAY_SIZE = 70,
-	GUI_OBJECTS_ARRAY_SIZE = 60
+	TEXT_ARRAY_SIZE = 70
 };
 
 #define COMMON_BUTTON_STYLE		get_commonbtn_w(), get_commonbtn_h()
@@ -62,4 +61,4 @@ enum {
 
 #endif /* WITHTOUCHGUI */
 
-#endif /* GUI_STRUCTS_H_INCLUDED */
+#endif /* _gui_settings_h */

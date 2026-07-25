@@ -1,12 +1,9 @@
 // Simple GUI от RA4ASN
 
-#ifndef GUI_WINDOWS_H
-#define GUI_WINDOWS_H
+#ifndef _gui_windows_h
+#define _gui_windows_h
 
 #include "gui_user_include.h"
-
-#if WITHTOUCHGUI
-
 #include "gui_structs.h"
 
 window_t * get_win(uint8_t window_id);
@@ -31,5 +28,4 @@ typedef enum {
     WINDOWS_COUNT
 } window_index_t;
 
-#endif /* WITHTOUCHGUI */
 #endif /* GUI_WINDOWS_H */

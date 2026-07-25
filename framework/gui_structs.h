@@ -1,18 +1,12 @@
 // Simple GUI от RA4ASN
-
-#ifndef GUI_STRUCTS_H_INCLUDED
-#define GUI_STRUCTS_H_INCLUDED
+#ifndef _gui_structs_h
+#define _gui_structs_h
 
 #include "gui_user_include.h"
-
-#if WITHTOUCHGUI
-
 #include "gui_system.h"
 #include "gui_settings.h"
 #include "gui_sdl2_api.h"
-#include "mslist.h"
 #include <SDL2/SDL_ttf.h>
-
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
 #define IS_BUTTON_LONG_PRESS	(type == TYPE_BUTTON && action == LONG_PRESSED)
@@ -140,8 +134,8 @@ typedef struct {
 } btn_bg_t;
 
 typedef struct {
-   char text[TEXT_ARRAY_SIZE];
-   gui_color_t color_line;
+	char text[TEXT_ARRAY_SIZE];
+	gui_color_t color_line;
 } tf_entry_t;
 
 typedef struct {
@@ -158,7 +152,7 @@ typedef struct {
 	uint16_t y1;
 	uint16_t w;
 	uint16_t h;
-    TTF_Font* font;
+	TTF_Font* font;
 } text_field_t;
 
 typedef struct {
@@ -191,7 +185,7 @@ typedef struct {
 	uint8_t index;
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
-    TTF_Font* font;
+	TTF_Font* font;
 } button_t;
 
 typedef struct {
@@ -206,15 +200,15 @@ typedef struct {
 	uint8_t index;
 	uint8_t width;				// ширина bounding box в символах
 	uint16_t width_text_pix;
-	int bbox_w;			// размеры bounding box в пикселях
+	int bbox_w;					// размеры bounding box в пикселях
 	int bbox_h;
 	align_t bbox_align;			// выравнивание внутри bounding box
 	uint16_t x;
 	uint16_t y;
 	uint8_t font_size;
 	uint8_t font_owned;  		// 1 — шрифт открыт меткой и должен быть закрыт при уничтожении
-    TTF_Font* font;
-    uint16_t baseline;      	// расстояние от верха bbox до baseline (= TTF_FontAscent)
+	TTF_Font* font;
+	uint16_t baseline;      	// расстояние от верха bbox до baseline (= TTF_FontAscent)
 } label_t;
 
 typedef enum  {
@@ -256,7 +250,7 @@ typedef enum {
 
 enum {
 	WIN_GUI_COUNT = 2,		 		// на экране не более 2х окон, одно из которых - основное на весь экран
-	WM_MAX_QUEUE_SIZE = 5			// размер очереди сообщений WM
+	WM_MAX_QUEUE_SIZE = 20			// размер очереди сообщений WM
 };
 
 typedef enum {
@@ -277,18 +271,18 @@ typedef struct {
 
 typedef struct {					// очередь сообщений окнам от WM о взаимодействии с элементами GUI
 	wm_data_t data[WM_MAX_QUEUE_SIZE];
-    size_t size;
+	size_t size;
 } wm_queue_t;
 
 typedef struct {
-//	*** обязательные для указания вручную элементы описателя ***
+	//	*** обязательные для указания вручную элементы описателя ***
 	const uint8_t window_id;		// в окне будут отображаться элементы с соответствующим полем for_window
 	uint8_t parent_id;				// UINT8_MAX - нет parent window
 	window_align_t align_mode;		// вертикаль выравнивания окна
 	char title[NAME_ARRAY_SIZE];	// текст, выводимый в заголовке окна
 	uint8_t is_close;				// разрешение или запрет вывода кнопки закрытия окна
 	void (*onVisibleProcess) (void);
-//	*** служебные и автоматически заполняемые элементы структуры ***
+	//	*** служебные и автоматически заполняемые элементы структуры ***
 	button_t * bh_ptr;				// указатели на массивы оконных элементов
 	uint8_t bh_count;
 	label_t * lh_ptr;
@@ -299,6 +293,7 @@ typedef struct {
 	uint8_t ta_count;
 	text_field_t * tf_ptr;
 	uint8_t tf_count;
+	button_t close_button;			// системная кнопка закрытия окна (встроена в окно, без глобального состояния)
 	wm_queue_t queue;
 	uint8_t first_call;				// признак первого вызова для различных инициализаций
 	uint8_t state;
@@ -316,22 +311,6 @@ typedef struct {
 	int8_t idx_bh_focus;
 	uint8_t idx_bh_focus_old;
 } window_t;
-
-typedef struct {
-	LIST_ENTRY list_entry;
-	obj_type_t type;			// тип элемента, поддерживающего реакцию на касания
-	window_t * win;					// указатель на parent window
-	void * link;					// указатель на запись массива окна с описанием элемента
-	uint8_t state;					// текущее состояние элемента
-	uint8_t visible;				// текущая видимость элемента
-	uint8_t is_trackable;			// поддерживает ли элемент возврат относительных координат перемещения точки нажатия
-	uint8_t is_repeating;			// повтор действия при длительном удержании
-	uint8_t is_long_press;			// разрешение обработки долгого нажатия
-	uint16_t x1;					// координаты области реакции на касание элемента
-	uint16_t y1;
-	uint16_t x2;
-	uint16_t y2;
-} gui_object_t;
 
 typedef struct {
 	uint16_t last_pressed_x; 	  	// последняя точка касания экрана
@@ -358,5 +337,4 @@ typedef enum {
 	EVENT_TYPE_KEY,
 } gui_event_type;
 
-#endif /* WITHTOUCHGUI */
-#endif /* GUI_STRUCTS_H_INCLUDED */
+#endif /* _gui_structs_h */

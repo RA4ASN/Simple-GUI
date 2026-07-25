@@ -305,12 +305,40 @@ static void obj_name_user(char * name)
 	if (r) name[r - name] = '\0';
 }
 
-// label: color, width_by_symbols
-// button: w, h, is_repeating, is_long_press, text,
-// text_field: w_sim, h_str, direction, font *
-// touch area: x, y, w, h, is_trackable
-// возвращает индекс созданного объекта
-
+// Вариабельные аргументы зависят от типа создаваемого объекта, который
+// определяется ПРЕФИКСОМ имени 'name' (btn_ / lbl_ / sl_ / ta_ / tf_).
+//
+// TYPE_LABEL  (lbl_):       gui_color_t color, uint32_t width_by_symbols
+//                           color            - цвет текста метки
+//                           width_by_symbols - ширина bounding box в символах
+//                                              (по ней заранее считается bbox_w/bbox_h)
+//
+// TYPE_BUTTON (btn_):       int w, int h, uint32_t is_repeating, uint32_t is_long_press, char * text
+//                           w, h          - размеры кнопки в пикселях
+//                           is_repeating  - флаг автоповтора при удержании
+//                           is_long_press - флаг обработки долгого нажатия
+//                           text          - текст кнопки ('|' - разделитель двух строк)
+//                           Примечание: is_repeating и is_long_press не должны
+//                           быть включены одновременно (проверка в objects_state).
+//
+// TYPE_TEXT_FIELD (tf_):    uint32_t w_sim, uint32_t h_str, uint32_t direction, void * font
+//                           w_sim     - ширина поля в символах
+//                           h_str     - число строк поля
+//                           direction - направление прокрутки (значения tf_direction_t: UP/DOWN)
+//                           font      - СЧИТЫВАЕТСЯ из varargs, но в SDL2-сборке ИГНОРИРУЕТСЯ
+//                                       (всегда используется общий моноширинный шрифт меток).
+//                                       Передавать ОБЯЗАТЕЛЬНО (например NULL), иначе va_arg
+//                                       прочитает непереданный аргумент = неопределённое поведение.
+//
+// TYPE_TOUCH_AREA (ta_):    int x, int y, int w, int h, int is_trackable
+//                           x, y, w, h   - геометрия области в координатах окна
+//                           is_trackable - флаг возврата относительных координат перемещения
+//
+// TYPE_SLIDER (sl_):        int orientation, int size, int step
+//                           orientation - ориентация шкалы (значения orientation_t:
+//                                         ORIENTATION_VERTICAL / ORIENTATION_HORIZONTAL)
+//                           size        - длина шкалы в пикселях
+//                           step        - шаг изменения значения (если 0, принудительно ставится 1)
 uint8_t gui_obj_create(const char * name, ...)
 {
 	uint8_t idx, window_id = get_parent_window();
@@ -690,7 +718,74 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 	return 0;
 }
 
-
+// Вариабельные аргументы зависят одновременно от ТИПА объекта (префикс имени 'name')
+// и от значения 'prop'. Ниже для каждого типа объекта перечислены prop, требующие
+// аргументов, и сами аргументы в порядке извлечения va_arg().
+// prop, не обрабатываемые для данного типа, просто игнорируются (va_arg не вызывается).
+//
+// ===================== TYPE_LABEL (lbl_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x
+// GUI_OBJ_POS_Y:            int y
+// GUI_OBJ_POS:              int x, int y                (две координаты за один вызов)
+// GUI_OBJ_PAYLOAD:          int payload
+// GUI_OBJ_TEXT:             char * text                 (копируется; кэш текста инвалидируется)
+// GUI_OBJ_TEXT_FMT:         char * format, ...          (format + аргументы форматирования,
+//                                                        потребляемые vsnprintf из того же va_list)
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_ALIGN:            int align                   (значения align_t)
+// GUI_OBJ_COLOR:            gui_color_t color
+// GUI_OBJ_FONT:             char * path, int font_size  (ДВА аргумента: путь к TTF-шрифту и размер;
+//                                                        старый динамический шрифт закрывается)
+//   После TEXT/TEXT_FMT/FONT пересчитываются метрики текста (width_text_pix/bbox_h/baseline);
+//   bbox_w пересчитывается только при GUI_OBJ_FONT.
+//
+// ===================== TYPE_BUTTON (btn_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x1
+// GUI_OBJ_POS_Y:            int y1
+// GUI_OBJ_POS:              int x1, int y1
+// GUI_OBJ_PAYLOAD:          int payload
+// GUI_OBJ_TEXT:             char * text
+// GUI_OBJ_TEXT_FMT:         char * format, ...          (format + аргументы форматирования для vsnprintf)
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_LOCK:             int is_locked               (0/1)
+// GUI_OBJ_WIDTH:            int w
+// GUI_OBJ_HEIGHT:           int h
+// GUI_OBJ_SIZE:             int w, int h                (два размера за один вызов)
+// GUI_OBJ_REPEAT:           int is_repeating            (0/1)
+// GUI_OBJ_LONG_PRESS:       int is_long_press           (0/1)
+// GUI_OBJ_FONT:             TTF_Font * font
+//
+// ===================== TYPE_SLIDER (sl_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x
+// GUI_OBJ_POS_Y:            int y
+// GUI_OBJ_POS:              int x, int y
+// GUI_OBJ_PAYLOAD:          int value                   (0..100 %)
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_SIZE:             int size                    (длина шкалы в пикселях)
+//
+// ===================== TYPE_TOUCH_AREA (ta_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x1
+// GUI_OBJ_POS_Y:            int y1
+// GUI_OBJ_POS:              int x1, int y1
+// GUI_OBJ_PAYLOAD:          int payload
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_WIDTH:            int w
+// GUI_OBJ_HEIGHT:           int h
+// GUI_OBJ_SIZE:             int w, int h
+//
+// ===================== TYPE_TEXT_FIELD (tf_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x1
+// GUI_OBJ_POS_Y:            int y1
+// GUI_OBJ_POS:              int x1, int y1
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_TEXT:             char * text, int color_line
+// GUI_OBJ_TEXT_FMT:         char * format, ..., int color_line
+// GUI_OBJ_CLEAN:            (нет вариабельных аргументов; очищает поле и сбрасывает индекс)
 void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 {
 	window_t * win = get_win(get_parent_window());

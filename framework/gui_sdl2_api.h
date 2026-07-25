@@ -1,12 +1,9 @@
 // Simple GUI от RA4ASN
 
-#ifndef GUI_SDL2_API_H_INCLUDED
-#define GUI_SDL2_API_H_INCLUDED
+#ifndef _gui_sdl2_api_h
+#define _gui_sdl2_api_h
 
 #include "gui_user_include.h"
-
-#if WITHTOUCHGUI && WITHSDL2VIDEO
-
 #include <SDL2/SDL.h>
 #include <math.h>
 
@@ -270,5 +267,4 @@ do { \
 #define TIME_PROFILE_STOP(label, desc) ((void)0)
 #endif /* GUI_TIME_PROFILER */
 
-#endif /* WITHTOUCHGUI && WITHSDL2VIDEO */
-#endif /* GUI_SDL2_API_H_INCLUDED */
+#endif /* _gui_sdl2_api_h */
