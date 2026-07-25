@@ -26,5 +26,11 @@ void gui_sdl2_get_text_size(const char* text, TTF_Font* font, int* w, int* h);
 // Отрисовка текста (с учетом кэша)
 void gui_sdl2_draw_text(const char* text, int x, int y, TTF_Font* font, gui_color_t color);
 
+// Инвалидация записей кэша, связанных с указанным шрифтом
+// Вызывать ПЕРЕД TTF_CloseFont
+void gui_sdl2_invalidate_font_cache(TTF_Font* font);
+
+void gui_sdl2_invalidate_text(const char* text, TTF_Font* font);
+
 #endif /* SDL2_FONTS */
 #endif /* GUI_SDL2_TEXT_H_INCLUDED */

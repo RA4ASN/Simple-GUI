@@ -276,4 +276,68 @@ void gui_sdl2_draw_text(const char* text, int x, int y, TTF_Font* font, gui_colo
     }
 }
 
+void gui_sdl2_invalidate_font_cache(TTF_Font* font)
+{
+    if (!font) return;
+
+    // Инвалидируем записи кэша размеров
+    for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
+        if (size_cache[i].valid && size_cache[i].font == font) {
+            size_cache[i].valid = 0;
+            size_cache[i].text[0] = '\0';
+            size_cache[i].w = 0;
+            size_cache[i].h = 0;
+        }
+    }
+
+    // Инвалидируем записи кэша текстур
+    for (int i = 0; i < TEX_CACHE_SIZE; i++) {
+        if (tex_cache[i].valid && tex_cache[i].font == font) {
+            if (tex_cache[i].texture) {
+                SDL_DestroyTexture(tex_cache[i].texture);
+                tex_cache[i].texture = NULL;
+            }
+            tex_cache[i].valid = 0;
+            tex_cache[i].text[0] = '\0';
+            tex_cache[i].w = 0;
+            tex_cache[i].h = 0;
+        }
+    }
+}
+
+void gui_sdl2_invalidate_text(const char* text, TTF_Font* font)
+{
+    if (!text || !font) return;
+
+    // Удалить из кэша размеров
+    for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
+        if (size_cache[i].valid &&
+            size_cache[i].font == font &&
+            strcmp(size_cache[i].text, text) == 0) {
+            size_cache[i].valid = 0;
+            size_cache[i].text[0] = '\0';
+            size_cache[i].w = 0;
+            size_cache[i].h = 0;
+            size_cache[i].lru_counter = 0;
+        }
+    }
+
+    // Удалить из кэша текстур
+    for (int i = 0; i < TEX_CACHE_SIZE; i++) {
+        if (tex_cache[i].valid &&
+            tex_cache[i].font == font &&
+            strcmp(tex_cache[i].text, text) == 0) {
+            if (tex_cache[i].texture) {
+                SDL_DestroyTexture(tex_cache[i].texture);
+                tex_cache[i].texture = NULL;
+            }
+            tex_cache[i].valid = 0;
+            tex_cache[i].text[0] = '\0';
+            tex_cache[i].w = 0;
+            tex_cache[i].h = 0;
+            tex_cache[i].lru_counter = 0;
+        }
+    }
+}
+
 #endif /* WITHTOUCHGUI && SDL2_FONTS */

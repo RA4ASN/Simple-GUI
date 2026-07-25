@@ -216,14 +216,17 @@ typedef struct {
 	uint8_t index;
 	uint8_t width;				// ширина bounding box в символах
 	uint16_t width_text_pix;
-	uint16_t bbox_w;			// размеры bounding box в пикселях
-	uint16_t bbox_h;
+	int bbox_w;			// размеры bounding box в пикселях
+	int bbox_h;
 	align_t bbox_align;			// выравнивание внутри bounding box
 	uint16_t x;
 	uint16_t y;
 	uint8_t font_size;
+
 #if SDL2_FONTS
+	uint8_t font_owned;  		// 1 — шрифт открыт меткой и должен быть закрыт при уничтожении
     TTF_Font* font;
+    uint16_t baseline;      	// расстояние от верха bbox до baseline (= TTF_FontAscent)
 #else
     const gui_mono_font_t * font;
 #endif

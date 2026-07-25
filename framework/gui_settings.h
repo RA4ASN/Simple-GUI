@@ -7,7 +7,11 @@
 
 #if WITHTOUCHGUI
 
+#define GUI_ETALON_W			800
+#define GUI_ETALON_H			480
+
 typedef struct {
+	float scale_ui;
 	uint16_t max_w;
 	uint16_t max_h;
 	uint8_t sliders_scale_thickness;	// ширина шкалы слайдера
@@ -29,8 +33,20 @@ typedef struct {
 extern gui_sizes_t gui_sizes;
 
 enum {
+	sliders_scale_thickness_default = 8,
+	sliders_w_default = 12,
+	sliders_h_default = 18,
+	window_title_height_default = 26,
+	window_close_button_size_default = 26,
+	window_title_indent_default = 20,
+	touch_area_enlarge_default = 5,
+	edge_step_default = 15,
+	footer_height_default = 50,
+	buttons_font_size_default = 18,
+	labels_font_size_default = 18,
+	win_title_font_size_default = 16,
+
 	button_round_radius = 3,	// радиус закругления кнопки
-	edge_step = 15,				// отступ от границ окна
 	autorepeat_delay = 4,		// задержка автоповтора действий
 	footer_buttons_count = 9,
 	common_btn_interval = 3,

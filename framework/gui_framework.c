@@ -400,30 +400,33 @@ void objects_state (window_t * win)
 	}
 
 	label_t * l = win->lh_ptr;
-	if(l != NULL)
-	{
-		for (uint8_t i = 0; i < win->lh_count; i ++)
-		{
-			label_t * lh = & l[i];
-			if (win->state)
-			{
+	if (l != NULL) {
+		for (uint8_t i = 0; i < win->lh_count; i++) {
+			label_t * lh = &l[i];
+			if (win->state) {
 				gui_object_t * new_obj = (gui_object_t *) calloc(1, sizeof(gui_object_t));
 				GUI_MEM_ASSERT(new_obj);
-
 				new_obj->link = lh;
 				new_obj->win = win;
 				new_obj->type = TYPE_LABEL;
-
-				InsertTailList(& gui_objects_list, & new_obj->list_entry);
-				gui_object_count ++;
-				debug_num ++;
-			}
-			else
-			{
+				InsertTailList(&gui_objects_list, &new_obj->list_entry);
+				gui_object_count++;
+				debug_num++;
+			} else {
 				GUI_VERIFY(remove_from_gui_list(lh));
-				debug_num --;
+				debug_num--;
 				gui_object_count--;
 				lh->visible = NON_VISIBLE;
+#if SDL2_FONTS
+				// Инвалидируем записи кэша для текста этой метки
+				gui_sdl2_invalidate_text(lh->text, lh->font);
+				// Закрываем динамически созданный шрифт
+				if (lh->font_owned && lh->font) {
+					TTF_CloseFont(lh->font);
+					lh->font = NULL;
+					lh->font_owned = 0;
+				}
+#endif
 				GUI_ASSERT(gui_object_count >= footer_buttons_count);
 			}
 		}
@@ -657,26 +660,41 @@ uint16_t gui_get_footer_h(void)
 	return gui_sizes.footer_height;
 }
 
-/* Инициализация GUI */
-void gui_initialize (uint16_t screen_w, uint16_t screen_h)
+int gui_scale_ui(int v)
 {
+	return (int)lroundf((float) v * gui_sizes.scale_ui);
+}
+
+/* Инициализация GUI */
+int gui_initialize (uint16_t screen_w, uint16_t screen_h)
+{
+	if (screen_w < GUI_ETALON_W || screen_h < GUI_ETALON_H)
+	{
+		GUI_DEBUG_PRINT("GUI: screen resolution %dx%d lesser than supported\n", screen_w, screen_h);
+		return 1;
+	}
+
 	gui_sizes.max_w = screen_w;
 	gui_sizes.max_h = screen_h;
 
-	gui_sizes.sliders_scale_thickness = screen_w / 10;
-	gui_sizes.sliders_w = screen_w / 66;
-	gui_sizes.sliders_h = screen_h / 30;
-	gui_sizes.window_title_height = screen_h / 18;
-	gui_sizes.edge_step = screen_h / 32;
-	gui_sizes.window_close_button_size = screen_h / 18;
-	gui_sizes.window_title_indent = screen_w / 40;
-	gui_sizes.touch_area_enlarge = screen_w / 160;
-	gui_sizes.footer_height = screen_h / 10;
+	float scale_x = (float) screen_w / (float) GUI_ETALON_W;
+	float scale_y = (float) screen_h / (float) GUI_ETALON_H;
+	gui_sizes.scale_ui = fmin(scale_x, scale_y);
+
+	gui_sizes.sliders_scale_thickness = gui_scale_ui(sliders_scale_thickness_default);
+	gui_sizes.sliders_w = gui_scale_ui(sliders_w_default);
+	gui_sizes.sliders_h = gui_scale_ui(sliders_h_default);
+	gui_sizes.window_title_height = gui_scale_ui(window_title_height_default);
+	gui_sizes.edge_step = gui_scale_ui(edge_step_default);
+	gui_sizes.window_close_button_size = gui_scale_ui(window_close_button_size_default);
+	gui_sizes.window_title_indent = gui_scale_ui(window_title_indent_default);
+	gui_sizes.touch_area_enlarge = gui_scale_ui(touch_area_enlarge_default);
+	gui_sizes.footer_height = gui_scale_ui(footer_height_default);
 	gui_sizes.common_btn_width = screen_w / footer_buttons_count + 1 - common_btn_interval;
-	gui_sizes.common_btn_height = gui_sizes.footer_height - (screen_h / 80);
-	gui_sizes.buttons_font_size = screen_w / 44;
-	gui_sizes.labels_font_size = screen_w / 44;
-	gui_sizes.win_title_font_size = screen_w / 50;
+	gui_sizes.common_btn_height = gui_sizes.footer_height - 6;
+	gui_sizes.buttons_font_size = gui_scale_ui(buttons_font_size_default);
+	gui_sizes.labels_font_size = gui_scale_ui(labels_font_size_default);
+	gui_sizes.win_title_font_size = gui_scale_ui(win_title_font_size_default);
 
 	InitializeListHead(& gui_objects_list);
 	gui_objects_init();
@@ -689,6 +707,8 @@ void gui_initialize (uint16_t screen_w, uint16_t screen_h)
 
 	gui_user_init();
 	inited = 1;
+
+	return 0;
 }
 
 /* Обновление данных в списке элементов открытых окон */

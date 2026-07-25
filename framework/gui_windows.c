@@ -261,8 +261,8 @@ void calculate_window_position(uint8_t mode, ...)
 		break;
 	}
 
-	shift_x = edge_step;
-	shift_y = (title_length ? gui_sizes.window_title_height : 0) + edge_step;
+	shift_x = gui_sizes.edge_step;
+	shift_y = (title_length ? gui_sizes.window_title_height : 0) + gui_sizes.edge_step;
 
 	// Выравнивание массива оконных элементов по центру окна
 	if (win->window_id != WINDOW_MAIN)
@@ -342,8 +342,8 @@ void calculate_window_position(uint8_t mode, ...)
 	{
 		win->x1 = x_start;
 		win->y1 = y_start;
-		win->w = xmax > title_length ? (xmax + edge_step * 2) : (title_length + edge_step * 2);
-		win->h = ymax + shift_y + edge_step;
+		win->w = xmax > title_length ? (xmax + gui_sizes.edge_step * 2) : (title_length + gui_sizes.edge_step * 2);
+		win->h = ymax + shift_y + gui_sizes.edge_step;
 		if (win->x1 + win->w >= gui_sizes.max_w)
 			win->x1 = gui_sizes.max_w - win->w - 1;
 
@@ -352,9 +352,9 @@ void calculate_window_position(uint8_t mode, ...)
 	}
 	else
 	{
-		win->w = xmax > title_length ? (xmax + edge_step * 2) : (title_length + edge_step * 2);
+		win->w = xmax > title_length ? (xmax + gui_sizes.edge_step * 2) : (title_length + gui_sizes.edge_step * 2);
 		win->w = (win->is_close && win->w < title_length + gui_sizes.window_close_button_size * 2) ? (win->w + gui_sizes.window_close_button_size) : win->w;
-		win->h = ymax + shift_y + edge_step;
+		win->h = ymax + shift_y + gui_sizes.edge_step;
 		win->y1 = align_y - win->h / 2;
 
 		switch (win->align_mode)
@@ -392,10 +392,10 @@ void calculate_window_position(uint8_t mode, ...)
 	}
 	else
 	{
-		win->draw_x1 = win->x1 + edge_step;
-		win->draw_y1 = win->y1 + edge_step + (title_length ? gui_sizes.window_title_height : 0);
-		win->draw_x2 = win->x1 + win->w - edge_step;
-		win->draw_y2 = win->y1 + win->h - edge_step;
+		win->draw_x1 = win->x1 + gui_sizes.edge_step;
+		win->draw_y1 = win->y1 + gui_sizes.edge_step + (title_length ? gui_sizes.window_title_height : 0);
+		win->draw_x2 = win->x1 + win->w - gui_sizes.edge_step;
+		win->draw_y2 = win->y1 + win->h - gui_sizes.edge_step;
 	}
 
 	if (win->is_moving)
