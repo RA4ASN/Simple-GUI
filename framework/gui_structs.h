@@ -11,10 +11,8 @@
 #include "gui_settings.h"
 #include "gui_sdl2_api.h"
 #include "mslist.h"
-
-#if SDL2_FONTS
 #include <SDL2/SDL_ttf.h>
-#endif
+
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
 #define IS_BUTTON_LONG_PRESS	(type == TYPE_BUTTON && action == LONG_PRESSED)
@@ -160,11 +158,7 @@ typedef struct {
 	uint16_t y1;
 	uint16_t w;
 	uint16_t h;
-#if SDL2_FONTS
     TTF_Font* font;
-#else
-    const gui_mono_font_t * font;
-#endif
 } text_field_t;
 
 typedef struct {
@@ -197,11 +191,7 @@ typedef struct {
 	uint8_t index;
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
-#if SDL2_FONTS
     TTF_Font* font;
-#else
-    const gui_prop_font_t * font;
-#endif
 } button_t;
 
 typedef struct {
@@ -222,14 +212,9 @@ typedef struct {
 	uint16_t x;
 	uint16_t y;
 	uint8_t font_size;
-
-#if SDL2_FONTS
 	uint8_t font_owned;  		// 1 — шрифт открыт меткой и должен быть закрыт при уничтожении
     TTF_Font* font;
     uint16_t baseline;      	// расстояние от верха bbox до baseline (= TTF_FontAscent)
-#else
-    const gui_mono_font_t * font;
-#endif
 } label_t;
 
 typedef enum  {

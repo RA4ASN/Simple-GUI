@@ -161,13 +161,9 @@ void calculate_window_position(uint8_t mode, ...)
 
     uint16_t title_length = 0;
     if (strcmp(win->title, "")) {
-#if SDL2_FONTS
         int tw = 0, th = 0;
         gui_sdl2_get_text_size(win->title, gui_sdl2_get_window_title_font(), &tw, &th);
         title_length = (uint16_t)tw;
-#else
-        title_length = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
-#endif
     }
 
 	GUI_ASSERT(win != NULL);
@@ -436,13 +432,9 @@ void draw_window(window_t * win)
     if (strcmp(win->title, ""))
     {
         uint16_t title_lenght = 0;
-#if SDL2_FONTS
         int tw = 0, th = 0;
         gui_sdl2_get_text_size(win->title, gui_sdl2_get_window_title_font(), &tw, &th);
         title_lenght = (uint16_t)tw;
-#else
-        title_lenght = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
-#endif
 
         uint16_t xt = 0;
         switch(win->title_align)
@@ -463,13 +455,7 @@ void draw_window(window_t * win)
         }
 
         __gui_draw_rect(x, y, win->w, gui_sizes.window_title_height, GUI_WINDOWTITLECOLOR, 1);
-
-#if SDL2_FONTS
         gui_sdl2_draw_text(win->title, xt, y + 5, gui_sdl2_get_window_title_font(), GUI_COLOR_BLACK);
-#else
-        __gui_print_prop(xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
-#endif
-        // ============================================
     }
 }
 

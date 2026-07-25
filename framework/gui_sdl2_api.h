@@ -5,8 +5,6 @@
 
 #include "gui_user_include.h"
 
-// Для не-SDL2 или bare metal окружения необходимо составить заголовочный файл
-// с аналогичным содержимым и функциями вывода графики
 #if WITHTOUCHGUI && WITHSDL2VIDEO
 
 #include <SDL2/SDL.h>

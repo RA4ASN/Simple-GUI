@@ -60,13 +60,6 @@ enum {
 #define SMALL_BUTTON_STYLE		get_commonbtn_h(), get_commonbtn_h()
 #define LONG_BUTTON_STYLE		(get_commonbtn_w() + get_commonbtn_w() / 3), get_commonbtn_h()
 
-#if EMBEDDED_FONTS
-#define BUTTONS_FONTP_DEFAULT	msgothic_15x17_prop
-#define LABELS_FONT_DEFAULT		msgothic_15x17_mono
-#define INFOBAR_FONTP			msgothic_13x16_prop
-#define WINDOW_TITLE_FONTP		msgothic_15x17_prop
-#endif
-
 #endif /* WITHTOUCHGUI */
 
 #endif /* GUI_STRUCTS_H_INCLUDED */

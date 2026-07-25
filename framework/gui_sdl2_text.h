@@ -4,8 +4,6 @@
 
 #include "gui_user_include.h"
 
-#if SDL2_FONTS
-
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include "gui_sdl2_api.h" // для gui_color_t и sdl2_get_renderer()
@@ -32,5 +30,4 @@ void gui_sdl2_invalidate_font_cache(TTF_Font* font);
 
 void gui_sdl2_invalidate_text(const char* text, TTF_Font* font);
 
-#endif /* SDL2_FONTS */
 #endif /* GUI_SDL2_TEXT_H_INCLUDED */

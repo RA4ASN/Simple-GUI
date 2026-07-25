@@ -74,11 +74,7 @@ void draw_label(label_t * lh)
 	else if	(lh->bbox_align == ALIGNMENT_RIGHT)
 		xx += lh->bbox_w - lh->width_text_pix;
 
-#if SDL2_FONTS
 	gui_sdl2_draw_text(lh->text, xx, y, lh->font, lh->color);
-#else
-    __gui_print_mono(x, y, lh->text, lh->font, lh->color);
-#endif
 }
 
 // *************** Buttons ****************
@@ -103,7 +99,6 @@ void draw_button(button_t * bh)
 	const uint16_t shiftY = bh->state == PRESSED ? 1 : 0;
 	const gui_color_t textcolor = GUI_COLOR_BLACK;
 
-#if SDL2_FONTS
     static const char delimeters[] = "|";
     if (strchr(bh->text, delimeters[0]) == NULL)
     {
@@ -134,29 +129,6 @@ void draw_button(button_t * bh)
             gui_sdl2_draw_text(text2, shiftX + x + (bh->w - tw2) / 2, y_start + line_h, bh->font, textcolor);
         }
     }
-#else
-    static const char delimeters[] = "|";
-    if (strchr(bh->text, delimeters[0]) == NULL)
-    {
-        int strlenP = get_strwidth_prop(bh->text, bh->font);
-        __gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - bh->font->height) / 2,
-        bh->text, bh->font, textcolor);
-    }
-    else
-    {
-        char * next;
-        uint8_t j = (bh->h - bh->font->height * 2) / 2;
-        char buf[TEXT_ARRAY_SIZE];
-        strcpy(buf, bh->text);
-        char * text2 = strtok_r(buf, delimeters, & next);
-        int strlenP = get_strwidth_prop(text2, bh->font);
-        __gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor);
-        text2 = strtok_r(NULL, delimeters, & next);
-        strlenP = get_strwidth_prop(text2, bh->font);
-        __gui_print_prop(shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - bh->font->height - j,
-        text2, bh->font, textcolor);
-    }
-#endif
 
 	if (bh->is_focus)
 		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
@@ -183,15 +155,10 @@ void textfield_update_size(text_field_t * tf)
 {
     GUI_ASSERT(tf != NULL);
 
-#if SDL2_FONTS
     int w_char = 0, h_char = 0;
     TTF_SizeText(tf->font, "M", &w_char, &h_char);
     tf->w = w_char * tf->w_sim;
     tf->h = h_char * tf->h_str;
-#else
-    tf->w = tf->font->width * tf->w_sim;
-    tf->h = tf->font->height * tf->h_str;
-#endif
 
     GUI_ASSERT(tf->w < gui_sizes.max_w);
     GUI_ASSERT(tf->h < gui_sizes.max_h - gui_sizes.window_title_height);
@@ -238,22 +205,15 @@ void draw_textfield(text_field_t * tf)
     uint16_t x = win->x1 + tf->x1;
     uint16_t y = win->y1 + tf->y1;
     int j = tf->index - 1;
-
-#if SDL2_FONTS
     int line_h = TTF_FontHeight(tf->font);
-#endif
 
     for (uint8_t i = 0; i < tf->h_str; i ++, j --)
     {
         uint8_t pos = tf->direction ? i : (tf->h_str - i - 1);
         j = j < 0 ? (tf->h_str - 1) : j;
 
-#if SDL2_FONTS
         gui_sdl2_draw_text(tf->string[j].text, x, y + line_h * pos, tf->font, tf->string[j].color_line);
-#else
-        __gui_print_mono(x, y + tf->font->height * pos,
-        tf->string[j].text, tf->font, tf->string[j].color_line);
-#endif
+
     }
 }
 
@@ -342,7 +302,7 @@ static obj_type_t parse_obj_name(const char * name)
 static void obj_name_user(char * name)
 {
 	char * r = strrchr(name, '#');
-	name[r - name] = '\0';
+	if (r) name[r - name] = '\0';
 }
 
 // label: color, width_by_symbols
@@ -366,8 +326,9 @@ uint8_t gui_obj_create(const char * name, ...)
 	{
 	case TYPE_LABEL:
 	{
-		win->lh_ptr = (label_t *) realloc(win->lh_ptr, sizeof(label_t) * (win->lh_count + 1));
-		GUI_MEM_ASSERT(win->lh_ptr);
+		label_t * lh_tmp = (label_t *) realloc(win->lh_ptr, sizeof(label_t) * (win->lh_count + 1));   // 1.2
+		GUI_MEM_ASSERT(lh_tmp);
+		win->lh_ptr = lh_tmp;
 
 		label_t * lh = &win->lh_ptr[win->lh_count];
 		memcpy(lh, &label_default, sizeof(label_t));
@@ -383,21 +344,13 @@ uint8_t gui_obj_create(const char * name, ...)
 		lh->font_size = gui_sizes.labels_font_size;
 		lh->bbox_align = ALIGNMENT_LEFT;
 		lh->font_owned = 0;
-#if SDL2_FONTS
+
 		lh->font = gui_sdl2_get_label_font();
 		memset(lh->text, '0', lh->width);		// для расчёта bbox
 		lh->text[lh->width] = '\0';
 		TTF_SizeText(lh->font, lh->text, &lh->bbox_w, &lh->bbox_h);
 		lh->width_text_pix = lh->bbox_w;
 		lh->baseline = TTF_FontAscent(lh->font);
-#else
-		memset(lh->text, '*', lh->width);
-		lh->text[lh->width] = '\0';
-		lh->font = & LABELS_FONT_DEFAULT;
-		lh->bbox_h = lh->font->height;
-		lh->bbox_w = get_strwidth_mono(" ", lh->font) * lh->width;
-		lh->width_text_pix = lh->bbox_w;
-#endif
 
 		idx = win->lh_count;
 		win->lh_count++;
@@ -406,8 +359,9 @@ uint8_t gui_obj_create(const char * name, ...)
 
 	case TYPE_BUTTON:
 	{
-		win->bh_ptr = (button_t *) realloc(win->bh_ptr, sizeof(button_t) * (win->bh_count + 1));
-		GUI_MEM_ASSERT(win->bh_ptr);
+		button_t * bh_tmp = (button_t *) realloc(win->bh_ptr, sizeof(button_t) * (win->bh_count + 1));   // 1.2
+		GUI_MEM_ASSERT(bh_tmp);
+		win->bh_ptr = bh_tmp;
 
 		button_t * bh = & win->bh_ptr[win->bh_count];
 		memcpy(bh, & button_default, sizeof(button_t));
@@ -423,11 +377,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		bh->index = win->bh_count;
 		bh->x1 = 0;
 		bh->y1 = 0;
-#if SDL2_FONTS
         bh->font = gui_sdl2_get_button_font();
-#else
-        bh->font = & BUTTONS_FONTP_DEFAULT;
-#endif
 
 		idx = win->bh_count;
 		win->bh_count ++;
@@ -435,42 +385,40 @@ uint8_t gui_obj_create(const char * name, ...)
 	}
 
 	case TYPE_TEXT_FIELD:
-		{
-			win->tf_ptr = (text_field_t *) realloc(win->tf_ptr, sizeof(text_field_t) * (win->tf_count + 1));
-			GUI_MEM_ASSERT(win->tf_ptr);
-			text_field_t * tf = & win->tf_ptr[win->tf_count];
-			memcpy(tf, & tf_default, sizeof(text_field_t));
-			tf->parent = window_id;
-			tf->w_sim = va_arg(arg, uint32_t);
-			tf->h_str = va_arg(arg, uint32_t);
-			tf->direction = (tf_direction_t) va_arg(arg, uint32_t);
+	{
+		text_field_t * tf_tmp = (text_field_t *) realloc(win->tf_ptr, sizeof(text_field_t) * (win->tf_count + 1));   // 1.2
+		GUI_MEM_ASSERT(tf_tmp);
+		win->tf_ptr = tf_tmp;
 
-			void * passed_font = va_arg(arg, void *);
+		text_field_t * tf = & win->tf_ptr[win->tf_count];
+		memcpy(tf, & tf_default, sizeof(text_field_t));
+		tf->parent = window_id;
+		tf->w_sim = va_arg(arg, uint32_t);
+		tf->h_str = va_arg(arg, uint32_t);
+		tf->direction = (tf_direction_t) va_arg(arg, uint32_t);
 
-#if SDL2_FONTS
-			tf->font = gui_sdl2_get_label_font(); // Переиспользуем моноширинный шрифт меток
-#else
-			tf->font = (gui_mono_font_t *) passed_font;
-#endif
+		void * passed_font = va_arg(arg, void *);	// Убрать
+		tf->font = gui_sdl2_get_label_font(); 		// Переиспользуем моноширинный шрифт меток
 
-			strncpy(tf->name, obj_name, NAME_ARRAY_SIZE);
-			tf->visible = 1;
-			tf->index = win->tf_count;
-			tf->x1 = 0;
-			tf->y1 = 0;
-			tf->string = (tf_entry_t *) calloc(tf->h_str, sizeof(tf_entry_t));
-			GUI_MEM_ASSERT(tf->string);
-			tf->index = 0;
-			textfield_update_size(tf);
-			idx = win->tf_count;
-			win->tf_count ++;
-			break;
-		}
+		strncpy(tf->name, obj_name, NAME_ARRAY_SIZE);
+		tf->visible = 1;
+		tf->index = win->tf_count;
+		tf->x1 = 0;
+		tf->y1 = 0;
+		tf->string = (tf_entry_t *) calloc(tf->h_str, sizeof(tf_entry_t));
+		GUI_MEM_ASSERT(tf->string);
+		tf->index = 0;
+		textfield_update_size(tf);
+		idx = win->tf_count;
+		win->tf_count ++;
+		break;
+	}
 
 	case TYPE_TOUCH_AREA:
 	{
-		win->ta_ptr = (touch_area_t *) realloc(win->ta_ptr, sizeof(touch_area_t) * (win->ta_count + 1));
-		GUI_MEM_ASSERT(win->ta_ptr);
+		touch_area_t * ta_tmp = (touch_area_t *) realloc(win->ta_ptr, sizeof(touch_area_t) * (win->ta_count + 1));   // 1.2
+		GUI_MEM_ASSERT(ta_tmp);
+		win->ta_ptr = ta_tmp;
 
 		touch_area_t * ta = & win->ta_ptr[win->ta_count];
 		memcpy(ta, & ta_default, sizeof(touch_area_t));
@@ -492,8 +440,9 @@ uint8_t gui_obj_create(const char * name, ...)
 
 	case TYPE_SLIDER:
 	{
-		win->sh_ptr = (slider_t *) realloc(win->sh_ptr, sizeof(slider_t) * (win->sh_count + 1));
-		GUI_MEM_ASSERT(win->sh_ptr);
+		slider_t * sh_tmp = (slider_t *) realloc(win->sh_ptr, sizeof(slider_t) * (win->sh_count + 1));   // 1.2
+		GUI_MEM_ASSERT(sh_tmp);
+		win->sh_ptr = sh_tmp;
 
 		slider_t * sh = & win->sh_ptr[win->sh_count];
 		memset(sh, 0, sizeof(slider_t));
@@ -562,9 +511,8 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 		y2 = lh2->y;
 		w2 = get_label_width(lh2);
 		h2 = get_label_height(lh2);
-#if SDL2_FONTS
 		baseline2 = lh2->baseline;
-#endif
+
 		break;
 
 	case TYPE_BUTTON:
@@ -589,6 +537,7 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 		y2 = sh2->y;
 		w2 = sh2->width;
 		h2 = sh2->height;
+		break;
 
 	default:
 		break;
@@ -606,11 +555,8 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 		else if (align == ALIGN_DOWN_MID) { lh1->x = x2 + w2 / 2 - get_label_width(lh1) / 2; lh1->y = y2 + h2 + offset; }
 		else if (align == ALIGN_DOWN_RIGHT) { lh1->x = x2 + w2 - get_label_width(lh1); lh1->y = y2 + h2 + offset; }
 		else if (align == ALIGN_LEFT_TOP) { lh1->x = x2; lh1->y = y2 - get_label_height(lh1) - offset; }
-#if SDL2_FONTS
 		else if (align == ALIGN_RIGHT_DOWN) { lh1->x = x2 + w2 + offset; lh1->y = y2 + baseline2 - lh1->baseline; }
-#else
-		else if (align == ALIGN_RIGHT_DOWN) { lh1->x = x2 + w2 + offset; lh1->y = y2 + h2 - get_label_height(lh1); }
-#endif
+
 		break;
 
 	case TYPE_BUTTON:
@@ -678,6 +624,8 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_POS_Y) return lh->y;
 		else if (prop == GUI_OBJ_PAYLOAD) return lh->payload;
 		else if (prop == GUI_OBJ_STATE) return lh->state;
+		else if (prop == GUI_OBJ_ALIGN) return lh->bbox_align;        /* + было только в set */
+		else if (prop == GUI_OBJ_COLOR) return (int) lh->color;       /* + было только в set */
 		else if (prop == GUI_OBJ_WIDTH) return lh->bbox_w;
 		else if (prop == GUI_OBJ_HEIGHT) return lh->bbox_h;
 		else if (prop == GUI_OBJ_INDEX) return lh->index;
@@ -691,9 +639,12 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_PAYLOAD) return bh->payload;
 		else if (prop == GUI_OBJ_STATE) return bh->state;
 		else if (prop == GUI_OBJ_LOCK) return bh->is_locked;
+		else if (prop == GUI_OBJ_REPEAT) return bh->is_repeating;     /* + было только в set */
+		else if (prop == GUI_OBJ_LONG_PRESS) return bh->is_long_press;/* + было только в set */
 		else if (prop == GUI_OBJ_WIDTH) return bh->w;
 		else if (prop == GUI_OBJ_HEIGHT) return bh->h;
 		else if (prop == GUI_OBJ_INDEX) return bh->index;
+		/* GUI_OBJ_FONT намеренно не читается: это указатель, в int не помещается. */
 		break;
 
 	case TYPE_SLIDER:
@@ -715,6 +666,9 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_POS_X) return ta->x1;
 		else if (prop == GUI_OBJ_POS_Y) return ta->y1;
 		else if (prop == GUI_OBJ_PAYLOAD) return ta->payload;
+		else if (prop == GUI_OBJ_STATE) return ta->state;             /* + отсутствовало */
+		else if (prop == GUI_OBJ_WIDTH) return ta->w;                 /* + отсутствовало */
+		else if (prop == GUI_OBJ_HEIGHT) return ta->h;                /* + отсутствовало */
 		else if (prop == GUI_OBJ_INDEX) return ta->index;
 		break;
 
@@ -723,6 +677,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		if (prop == GUI_OBJ_VISIBLE) return tf->visible;
 		else if (prop == GUI_OBJ_POS_X) return tf->x1;
 		else if (prop == GUI_OBJ_POS_Y) return tf->y1;
+		else if (prop == GUI_OBJ_STATE) return tf->state;             /* + отсутствовало */
 		else if (prop == GUI_OBJ_WIDTH) return tf->w;
 		else if (prop == GUI_OBJ_HEIGHT) return tf->h;
 		else if (prop == GUI_OBJ_INDEX) return tf->index;
@@ -731,8 +686,10 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 	default:
 		break;
 	}
+
 	return 0;
 }
+
 
 void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 {
@@ -740,90 +697,79 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 	obj_type_t type = parse_obj_name(name);
 	void * obj = find_gui_obj(type, win, name);
 	uint8_t flag = 0;
-
 	va_list arg;
 	va_start(arg, prop);
 
 	switch(type)
 	{
 	case TYPE_LABEL:
-	label_t * lh = (label_t *) obj;
-	if (prop == GUI_OBJ_VISIBLE) lh->visible = !! va_arg(arg, int);
-	else if (prop == GUI_OBJ_POS_X) lh->x = va_arg(arg, int);
-	else if (prop == GUI_OBJ_POS_Y) lh->y = va_arg(arg, int);
-	else if (prop == GUI_OBJ_POS) { lh->x = va_arg(arg, int); lh->y = va_arg(arg, int); }
-	else if (prop == GUI_OBJ_PAYLOAD) lh->payload = va_arg(arg, int);
-	else if (prop == GUI_OBJ_TEXT) {
-	#if SDL2_FONTS
-	    gui_sdl2_invalidate_text(lh->text, lh->font);
-	#endif
-	    strncpy(lh->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
-	    flag = 1;
-	}
-	else if (prop == GUI_OBJ_TEXT_FMT) {
-	#if SDL2_FONTS
-	    gui_sdl2_invalidate_text(lh->text, lh->font);
-	#endif
-	    vsnprintf(lh->text, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
-	    flag = 1;
-	}
-	else if (prop == GUI_OBJ_STATE) lh->state = va_arg(arg, int);
-	else if (prop == GUI_OBJ_ALIGN) lh->bbox_align = va_arg(arg, int);
-	else if (prop == GUI_OBJ_COLOR) lh->color = va_arg(arg, gui_color_t);
-	else if (prop == GUI_OBJ_FONT) { flag = 1;
-#if SDL2_FONTS
-	    // Инвалидируем кэш для старого шрифта
-	    gui_sdl2_invalidate_text(lh->text, lh->font);
-	    // Закрываем старый динамический шрифт
-	    if (lh->font_owned && lh->font) {
-	        TTF_CloseFont(lh->font);
-	        lh->font = NULL;
-	    }
-	    char * path = va_arg(arg, char *);
-	    lh->font_size = va_arg(arg, int);
-	    lh->font = TTF_OpenFont(path, lh->font_size);
-	    lh->font_owned = 1;
-	    if (!lh->font) {
-	        printf("[GUI] Failed to open font %s size %d: %s\n", path, lh->font_size, TTF_GetError());
-	        lh->font = gui_sdl2_get_label_font();
-	        lh->font_owned = 0;
-	    }
-#else
-	    lh->font = va_arg(arg, gui_mono_font_t *);
-	    int dummy = va_arg(arg, int);
-	    lh->font_owned = 0;
-#endif
-	}
-	if (flag)
-	{
-#if SDL2_FONTS
-	    // Пересчитываем ТОЛЬКО width_text_pix (реальная ширина текущего текста)
-	    // bbox_w и bbox_h пересчитываем ТОЛЬКО при смене шрифта
-	    int w, h;
-	    TTF_SizeText(lh->font, lh->text, &w, &h);
-	    lh->width_text_pix = w;
-	    lh->baseline = TTF_FontAscent(lh->font);
-	    lh->bbox_h = h;  // высота шрифта не зависит от текста
+		label_t * lh = (label_t *) obj;
+		if (prop == GUI_OBJ_VISIBLE) lh->visible = !! va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_X) lh->x = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_Y) lh->y = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS) { lh->x = va_arg(arg, int); lh->y = va_arg(arg, int); }
+		else if (prop == GUI_OBJ_PAYLOAD) lh->payload = va_arg(arg, int);
+		else if (prop == GUI_OBJ_TEXT || prop == GUI_OBJ_TEXT_FMT) {
+		    char tmp[TEXT_ARRAY_SIZE];
+		    if (prop == GUI_OBJ_TEXT) {
+		        const char * s = va_arg(arg, char *);
+		        strncpy(tmp, s, TEXT_ARRAY_SIZE - 1);
+		        tmp[TEXT_ARRAY_SIZE - 1] = '\0';
+		    } else {
+		        vsnprintf(tmp, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
+		        tmp[TEXT_ARRAY_SIZE - 1] = '\0';
+		    }
+		    if (strcmp(tmp, lh->text) != 0) {            // текст реально изменился
+		        gui_sdl2_invalidate_text(lh->text, lh->font);   // инвалидируем СТАРЫЙ текст
+		        strcpy(lh->text, tmp);                          // пишем новый
+		        flag = 1;
+		    }
+		    /* если тексты равны — ничего не делаем: кэш остаётся валидным,
+		       TTF_SizeText ниже не вызывается, перерисовка текста не нужна */
+		}
+		else if (prop == GUI_OBJ_STATE) lh->state = va_arg(arg, int);
+		else if (prop == GUI_OBJ_ALIGN) lh->bbox_align = va_arg(arg, int);
+		else if (prop == GUI_OBJ_COLOR) lh->color = va_arg(arg, gui_color_t);
+		else if (prop == GUI_OBJ_FONT) { flag = 1;
+			// Инвалидируем кэш для старого шрифта
+			gui_sdl2_invalidate_text(lh->text, lh->font);
+			// Закрываем старый динамический шрифт
+			if (lh->font_owned && lh->font) {
+				TTF_CloseFont(lh->font);
+				lh->font = NULL;
+			}
+			char * path = va_arg(arg, char *);
+			lh->font_size = va_arg(arg, int);
+			lh->font = TTF_OpenFont(path, lh->font_size);
+			lh->font_owned = 1;
+			if (!lh->font) {
+				printf("[GUI] Failed to open font %s size %d: %s\n", path, lh->font_size, TTF_GetError());
+				lh->font = gui_sdl2_get_label_font();
+				lh->font_owned = 0;
+			}
+		}
 
-	    // bbox_w пересчитываем только при смене шрифта (prop == GUI_OBJ_FONT)
-	    // При смене текста bbox_w остаётся неизменным!
-	    if (prop == GUI_OBJ_FONT) {
-	        char widest[TEXT_ARRAY_SIZE];
-	        memset(widest, '0', lh->width);
-	        widest[lh->width] = '\0';
-	        int ww, wh;
-	        TTF_SizeText(lh->font, widest, &ww, &wh);
-	        lh->bbox_w = ww;
-	    }
-#else
-	    lh->bbox_h = lh->font->height;
-	    lh->width_text_pix = get_strwidth_mono(lh->text, lh->font);
-	    if (prop == GUI_OBJ_FONT) {
-	        lh->bbox_w = get_strwidth_mono(" ", lh->font) * lh->width;
-	    }
-#endif
-	}
-	break;
+		if (flag)
+		{
+			// Пересчитываем ТОЛЬКО width_text_pix (реальная ширина текущего текста)
+			// bbox_w и bbox_h пересчитываем ТОЛЬКО при смене шрифта
+			int w, h;
+			TTF_SizeText(lh->font, lh->text, &w, &h);
+			lh->width_text_pix = w;
+			lh->baseline = TTF_FontAscent(lh->font);
+			lh->bbox_h = h;  // высота шрифта не зависит от текста
+			// bbox_w пересчитываем только при смене шрифта (prop == GUI_OBJ_FONT)
+			// При смене текста bbox_w остаётся неизменным!
+			if (prop == GUI_OBJ_FONT) {
+				char widest[TEXT_ARRAY_SIZE];
+				memset(widest, '0', lh->width);
+				widest[lh->width] = '\0';
+				int ww, wh;
+				TTF_SizeText(lh->font, widest, &ww, &wh);
+				lh->bbox_w = ww;
+			}
+		}
+		break;
 
 	case TYPE_BUTTON:
 		button_t * bh = (button_t *) obj;
@@ -841,8 +787,7 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_SIZE) { bh->w = va_arg(arg, int); bh->h = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_REPEAT) bh->is_repeating = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_LONG_PRESS) bh->is_long_press = !! va_arg(arg, int);
-//		else if (prop == GUI_OBJ_FONT) bh->font = va_arg(arg, gui_prop_font_t *);
-
+		else if (prop == GUI_OBJ_FONT) { bh->font = va_arg(arg, TTF_Font *); }
 		break;
 
 	case TYPE_SLIDER:
@@ -852,7 +797,21 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_POS_Y) sh->y = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { sh->x = va_arg(arg, int); sh->y = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_PAYLOAD) sh->value = va_arg(arg, int);
+		else if (prop == GUI_OBJ_STATE) sh->state = va_arg(arg, int);   /* + читалось, но не писалось */
+		else if (prop == GUI_OBJ_SIZE) sh->size = va_arg(arg, int);     /* + читалось, но не писалось */
+		break;
 
+	case TYPE_TOUCH_AREA:                                                /* + case отсутствовал целиком */
+		touch_area_t * ta = (touch_area_t *) obj;
+		if (prop == GUI_OBJ_VISIBLE) ta->visible = !! va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_X) ta->x1 = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_Y) ta->y1 = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS) { ta->x1 = va_arg(arg, int); ta->y1 = va_arg(arg, int); }
+		else if (prop == GUI_OBJ_PAYLOAD) ta->payload = va_arg(arg, int);
+		else if (prop == GUI_OBJ_STATE) ta->state = va_arg(arg, int);
+		else if (prop == GUI_OBJ_WIDTH) ta->w = va_arg(arg, int);
+		else if (prop == GUI_OBJ_HEIGHT) ta->h = va_arg(arg, int);
+		else if (prop == GUI_OBJ_SIZE) { ta->w = va_arg(arg, int); ta->h = va_arg(arg, int); }
 		break;
 
 	case TYPE_TEXT_FIELD:
@@ -861,6 +820,7 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_POS_X) tf->x1 = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_Y) tf->y1 = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { tf->x1 = va_arg(arg, int); tf->y1 = va_arg(arg, int); }
+		else if (prop == GUI_OBJ_STATE) tf->state = va_arg(arg, int);   /* + отсутствовало */
 		else if (prop == GUI_OBJ_TEXT) {
 			tf_entry_t * rec = &  tf->string[tf->index];
 			strncpy(rec->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
@@ -879,7 +839,6 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			tf->index = 0;
 			memset(tf->string, 0, tf->h_str * sizeof(tf_entry_t));
 		}
-
 		break;
 
 	default:

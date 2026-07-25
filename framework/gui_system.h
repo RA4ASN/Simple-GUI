@@ -7,7 +7,6 @@
 
 #if WITHTOUCHGUI
 
-#include "fonts/embedded_fonts.h"
 #include "gui_structs.h"
 
 #define GUI_ASSERT(v) do { if ((v) == 0) { \

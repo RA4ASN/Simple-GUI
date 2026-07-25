@@ -2,7 +2,7 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI && SDL2_FONTS
+#if WITHTOUCHGUI
 
 #include "gui_sdl2_text.h"
 #include <string.h>
@@ -121,134 +121,124 @@ static void print_cache_stats(void)
 #endif
 
 // === Кэш размеров (LRU) ===
-static gui_size_cache_entry_t* find_size_cache(const char* text, TTF_Font* font)
-{
-    int first_empty_idx = -1;
-    int min_lru = INT_MAX;
-    int min_lru_idx = 0;
-    int is_hit = 0;
+static gui_size_cache_entry_t* find_size_cache(const char* text, TTF_Font* font) {
+	int first_empty_idx = -1;
+	int min_lru = INT_MAX;
+	int min_lru_idx = 0;
+	int is_hit = 0;
 
-    for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
-        // 1. Ищем точное совпадение
-        if (size_cache[i].valid &&
-            size_cache[i].font == font &&
-            strcmp(size_cache[i].text, text) == 0) {
-            size_cache[i].lru_counter = ++size_lru_counter;
-            is_hit = 1;
-            min_lru_idx = i;
-            break; // Нашли, дальше искать не нужно
-        }
-        // 2. Запоминаем первую свободную ячейку (на случай промаха)
-        if (!size_cache[i].valid && first_empty_idx == -1) {
-            first_empty_idx = i;
-        }
-        // 3. Ищем самую старую (LRU)
-        if (size_cache[i].lru_counter < min_lru) {
-            min_lru = size_cache[i].lru_counter;
-            min_lru_idx = i;
-        }
-    }
+	for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
+		if (size_cache[i].valid && size_cache[i].font == font
+				&& strcmp(size_cache[i].text, text) == 0) {
+			size_cache[i].lru_counter = ++size_lru_counter;
+			is_hit = 1;
+			min_lru_idx = i;
+			break;
+		}
+		if (!size_cache[i].valid && first_empty_idx == -1)
+			first_empty_idx = i;
+		if (size_cache[i].lru_counter < min_lru) {
+			min_lru = size_cache[i].lru_counter;
+			min_lru_idx = i;
+		}
+	}
 
-    // Определяем целевой индекс: при попадании - это найденный, при промахе - свободный или самый старый
-    int target_idx = is_hit ? min_lru_idx : (first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
+	int target_idx =
+			is_hit ?
+					min_lru_idx :
+					(first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
 
 #if GUI_SDL2_TEXT_CACHE_STATS
-    if (is_hit) {
-        size_cache_hits_sec++;
-    } else {
-        size_cache_misses_sec++;
-    }
-    print_cache_stats();
+	if (is_hit) size_cache_hits_sec++; else size_cache_misses_sec++;
+	print_cache_stats();
 #endif
 
-    gui_size_cache_entry_t* entry = &size_cache[target_idx];
+	// ХИТ: запись уже содержит актуальные w/h — возвращаем БЕЗ пересчёта
+	if (is_hit)
+		return &size_cache[target_idx];
 
-    if (font && text) {
-        TTF_SizeText(font, text, &entry->w, &entry->h);
-        strncpy(entry->text, text, TEXT_ARRAY_SIZE - 1);
-        entry->text[TEXT_ARRAY_SIZE - 1] = '\0';
-        entry->font = font;
-        entry->valid = 1;
-        entry->lru_counter = ++size_lru_counter;
-    }
-    return entry;
+	// ПРОМАХ: считаем размер и заполняем ячейку
+	gui_size_cache_entry_t* entry = &size_cache[target_idx];
+	if (font && text) {
+		TTF_SizeText(font, text, &entry->w, &entry->h);
+		strncpy(entry->text, text, TEXT_ARRAY_SIZE - 1);
+		entry->text[TEXT_ARRAY_SIZE - 1] = '\0';
+		entry->font = font;
+		entry->valid = 1;
+		entry->lru_counter = ++size_lru_counter;
+	}
+	return entry;
 }
 
 // === Кэш текстур (LRU) ===
-static gui_tex_cache_entry_t* find_tex_cache(const char* text, TTF_Font* font, SDL_Color color)
-{
-    int first_empty_idx = -1;
-    int min_lru = INT_MAX;
-    int min_lru_idx = 0;
-    int is_hit = 0;
+static gui_tex_cache_entry_t* find_tex_cache(const char* text, TTF_Font* font,
+		SDL_Color color) {
+	int first_empty_idx = -1;
+	int min_lru = INT_MAX;
+	int min_lru_idx = 0;
+	int is_hit = 0;
 
-    for (int i = 0; i < TEX_CACHE_SIZE; i++) {
-        // 1. Ищем точное совпадение
-        if (tex_cache[i].valid &&
-            tex_cache[i].font == font &&
-            tex_cache[i].color.r == color.r &&
-            tex_cache[i].color.g == color.g &&
-            tex_cache[i].color.b == color.b &&
-            tex_cache[i].color.a == color.a &&
-            strcmp(tex_cache[i].text, text) == 0) {
-            tex_cache[i].lru_counter = ++tex_lru_counter;
-            is_hit = 1;
-            min_lru_idx = i;
-            break; // Нашли, дальше искать не нужно
-        }
-        // 2. Запоминаем первую свободную ячейку (на случай промаха)
-        if (!tex_cache[i].valid && first_empty_idx == -1) {
-            first_empty_idx = i;
-        }
-        // 3. Ищем самую старую (LRU)
-        if (tex_cache[i].lru_counter < min_lru) {
-            min_lru = tex_cache[i].lru_counter;
-            min_lru_idx = i;
-        }
-    }
+	for (int i = 0; i < TEX_CACHE_SIZE; i++) {
+		if (tex_cache[i].valid && tex_cache[i].font == font
+				&& tex_cache[i].color.r == color.r
+				&& tex_cache[i].color.g == color.g
+				&& tex_cache[i].color.b == color.b
+				&& tex_cache[i].color.a == color.a
+				&& strcmp(tex_cache[i].text, text) == 0) {
+			tex_cache[i].lru_counter = ++tex_lru_counter;
+			is_hit = 1;
+			min_lru_idx = i;
+			break;
+		}
+		if (!tex_cache[i].valid && first_empty_idx == -1)
+			first_empty_idx = i;
+		if (tex_cache[i].lru_counter < min_lru) {
+			min_lru = tex_cache[i].lru_counter;
+			min_lru_idx = i;
+		}
+	}
 
-    // Определяем целевой индекс
-    int target_idx = is_hit ? min_lru_idx : (first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
+	int target_idx =
+			is_hit ?
+					min_lru_idx :
+					(first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
 
 #if GUI_SDL2_TEXT_CACHE_STATS
-    if (is_hit) {
-        tex_cache_hits_sec++;
-    } else {
-        tex_cache_misses_sec++;
-    }
-    print_cache_stats();
+	if (is_hit) tex_cache_hits_sec++; else tex_cache_misses_sec++;
+	print_cache_stats();
 #endif
 
-    gui_tex_cache_entry_t* entry = &tex_cache[target_idx];
+	// ХИТ: текстура уже готова — возвращаем БЕЗ рендера и БЕЗ destroy
+	if (is_hit)
+		return &tex_cache[target_idx];
 
-    // Если ячейка была занята другой текстурой (промах кэша + вытеснение LRU), уничтожаем старую
-    if (entry->valid && entry->texture) {
-        SDL_DestroyTexture(entry->texture);
-    }
+	// ПРОМАХ: освобождаем вытесняемую текстуру (если ячейка была занята) и рендерим заново
+	gui_tex_cache_entry_t* entry = &tex_cache[target_idx];
+	if (entry->valid && entry->texture)
+		SDL_DestroyTexture(entry->texture);
 
-    strncpy(entry->text, text, TEXT_ARRAY_SIZE - 1);
-    entry->text[TEXT_ARRAY_SIZE - 1] = '\0';
-    entry->font = font;
-    entry->color = color;
-    entry->valid = 1;
-    entry->lru_counter = ++tex_lru_counter;
+	strncpy(entry->text, text, TEXT_ARRAY_SIZE - 1);
+	entry->text[TEXT_ARRAY_SIZE - 1] = '\0';
+	entry->font = font;
+	entry->color = color;
+	entry->valid = 1;
+	entry->lru_counter = ++tex_lru_counter;
 
-    SDL_Surface* surf = TTF_RenderText_Blended(font, text, color);
-    if (surf) {
-        entry->texture = SDL_CreateTextureFromSurface(sdl2_get_renderer(), surf);
-        if (entry->texture) {
-            SDL_SetTextureBlendMode(entry->texture, SDL_BLENDMODE_BLEND);
-        }
-        entry->w = surf->w;
-        entry->h = surf->h;
-        SDL_FreeSurface(surf);
-    } else {
-        entry->texture = NULL;
-        entry->w = 0;
-        entry->h = 0;
-    }
-
-    return entry;
+	SDL_Surface* surf = TTF_RenderText_Blended(font, text, color);
+	if (surf) {
+		entry->texture = SDL_CreateTextureFromSurface(sdl2_get_renderer(),
+				surf);
+		if (entry->texture)
+			SDL_SetTextureBlendMode(entry->texture, SDL_BLENDMODE_BLEND);
+		entry->w = surf->w;
+		entry->h = surf->h;
+		SDL_FreeSurface(surf);
+	} else {
+		entry->texture = NULL;
+		entry->w = 0;
+		entry->h = 0;
+	}
+	return entry;
 }
 
 void gui_sdl2_get_text_size(const char* text, TTF_Font* font, int* w, int* h)
@@ -340,4 +330,4 @@ void gui_sdl2_invalidate_text(const char* text, TTF_Font* font)
     }
 }
 
-#endif /* WITHTOUCHGUI && SDL2_FONTS */
+#endif /* WITHTOUCHGUI */
