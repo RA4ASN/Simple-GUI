@@ -655,6 +655,17 @@ static void slider_process(slider_t * sl)
 	}
 }
 
+void gui_print_text(uint16_t x, uint16_t y, const char * text, const gui_font_t * font, gui_color_t color)
+{
+	window_t * win = get_win(get_current_drawing_window());
+	const gui_drawbuf_t * gdb = __gui_get_drawbuf();
+
+	const uint16_t xn = x + win->draw_x1;
+	const uint16_t yn = y + win->draw_y1;
+
+	__gui_print_text(gdb, xn, yn, text, font, color);
+}
+
 /* Инициализация GUI */
 void gui_initialize (void)
 {

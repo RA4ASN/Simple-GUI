@@ -4,12 +4,8 @@
 #include "gui_port_include.h"
 
 #if WITHTOUCHGUI
-#if ! GUI_EXTERNAL_FONTS
-	#include "fonts/embedded_fonts.h"
-#else
-	#include "../gui_user_fonts.h"
-#endif
 
+#include "gui_user_fonts.h"
 #include "gui_structs.h"
 
 void * find_gui_obj(obj_type_t type, window_t * win, const char * name);
@@ -32,7 +28,7 @@ void gui_drawrect_rounded(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, ui
 void gui_drawrect_transparent(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t alpha);
 void gui_drawDashedRectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t dashLength, gui_color_t color);
 const gui_drawbuf_t * gui_get_drawbuf(void);
-
+void gui_print_text(uint16_t x, uint16_t y, const char * text, const unifont_t * font, gui_color_t color);
 void process_gui(void);
 
 #endif /* WITHTOUCHGUI */

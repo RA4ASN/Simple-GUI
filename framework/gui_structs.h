@@ -152,7 +152,7 @@ typedef struct {
 	uint8_t parent;
 	uint8_t visible;
 	tf_direction_t direction;
-	const gui_mono_font_t * font;
+	const unifont_t * font;
 	char name[NAME_ARRAY_SIZE];
 	uint8_t index;
 	tf_entry_t * string;
@@ -195,7 +195,7 @@ typedef struct {
 	uint8_t index;
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
-	const gui_prop_font_t * font;
+	const unifont_t * font;
 #if GUI_USE_CACHE
 	gui_objects_cache_t * cache;
 #endif /* GUI_USE_CACHE */
@@ -216,7 +216,7 @@ typedef struct {
 	uint16_t height_pix;
 	uint16_t x;
 	uint16_t y;
-	const gui_mono_font_t * font;
+	const unifont_t * font;
 #if GUI_USE_CACHE
 	gui_objects_cache_t * cache;
 #endif /* GUI_USE_CACHE */

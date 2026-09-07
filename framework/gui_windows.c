@@ -210,7 +210,7 @@ void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay)
 void calculate_window_position(uint8_t mode, ...)
 {
 	window_t * win = get_win(get_parent_window());
-	uint16_t title_length = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
+	uint16_t title_length = get_strwidth(win->title, & WINDOW_TITLE_FONTP);
 	uint16_t xmax = 0, ymax = 0, shift_x, shift_y, x_start, y_start;
 
 	GUI_ASSERT(win != NULL);
@@ -480,7 +480,7 @@ static void __draw_window(window_t * win, uint16_t x, uint16_t y, const gui_draw
 	// вывод заголовка окна
 	if (strcmp(win->title, ""))
 	{
-		uint16_t title_lenght = get_strwidth_prop(win->title, & WINDOW_TITLE_FONTP);
+		uint16_t title_lenght = get_strwidth(win->title, & WINDOW_TITLE_FONTP);
 		uint16_t xt = 0;
 
 		switch(win->title_align)
@@ -504,7 +504,7 @@ static void __draw_window(window_t * win, uint16_t x, uint16_t y, const gui_draw
 		}
 
 		__gui_draw_rect(drawbuf, x, y, win->w, window_title_height, GUI_WINDOWTITLECOLOR, 1);
-		__gui_print_prop(drawbuf, xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
+		__gui_print_text(drawbuf, xt, y + 5, win->title, & WINDOW_TITLE_FONTP, GUI_COLOR_BLACK);
 	}
 }
 

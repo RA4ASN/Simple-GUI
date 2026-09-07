@@ -59,7 +59,7 @@ uint16_t get_label_height2(const char * name)
 
 static void __draw_label(label_t * lh, uint16_t x, uint16_t y, const gui_drawbuf_t * db)
 {
-	__gui_print_mono(db, x, y, lh->text, lh->font, lh->color);
+	__gui_print_text(db, x, y, lh->text, lh->font, lh->color);
 }
 
 void draw_label(label_t * lh)
@@ -198,24 +198,24 @@ static void __draw_button(button_t * bh, uint16_t x, uint16_t y, const gui_drawb
 	if (strchr(bh->text, delimeters[0]) == NULL)
 	{
 		/* Однострочная надпись */
-		int strlenP = get_strwidth_prop(bh->text, bh->font);
-		__gui_print_prop(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - bh->font->height) / 2,
+		int strlenP = get_strwidth(bh->text, bh->font);
+		__gui_print_text(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + y + (bh->h - get_strheight(bh->font)) / 2,
 				bh->text, bh->font, textcolor);
 	} else
 	{
 		/* Двухстрочная надпись */
 		char * next;
-		uint8_t j = (bh->h - bh->font->height * 2) / 2;
+		uint8_t j = (bh->h - get_strheight(bh->font) * 2) / 2;
 		char buf[TEXT_ARRAY_SIZE];
 		strcpy(buf, bh->text);
 		char * text2 = strtok_r(buf, delimeters, & next);
 
-		int strlenP = get_strwidth_prop(text2, bh->font);
-		__gui_print_prop(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor);
+		int strlenP = get_strwidth(text2, bh->font);
+		__gui_print_text(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + y + j, text2, bh->font, textcolor);
 
 		text2 = strtok_r(NULL, delimeters, & next);
-		strlenP = get_strwidth_prop(text2, bh->font);
-		__gui_print_prop(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - bh->font->height - j,
+		strlenP = get_strwidth(text2, bh->font);
+		__gui_print_text(db, shiftX + x + (bh->w - strlenP) / 2, shiftY + bh->h + y - get_strheight(bh->font) - j,
 				text2, bh->font, textcolor);
 	}
 
@@ -341,8 +341,8 @@ void textfield_update_size(text_field_t * tf)
 {
 	GUI_ASSERT(tf != NULL);
 
-	tf->w = tf->font->width * tf->w_sim;
-	tf->h = tf->font->height * tf->h_str;
+	tf->w = get_strwidth(" ", tf->font) * tf->w_sim;
+	tf->h = get_strheight(tf->font);
 
 	GUI_ASSERT(tf->w < WITHGUIMAXX);
 	GUI_ASSERT(tf->h < WITHGUIMAXY - window_title_height);
@@ -392,7 +392,7 @@ static void __draw_textfield(text_field_t * tf, uint16_t x, uint16_t y, const gu
 		uint8_t pos = tf->direction ? i : (tf->h_str - i - 1);
 		j = j < 0 ? (tf->h_str - 1) : j;
 
-		__gui_print_mono(drawbuf, x, y + tf->font->height * pos,
+		__gui_print_text(drawbuf, x, y + get_strheight(tf->font) * pos,
 				tf->string[j].text, tf->font, tf->string[j].color_line);
 
 		j --;
@@ -640,12 +640,12 @@ uint8_t gui_obj_create(const char * name, ...)
 		lh->x = 0;
 		lh->y = 0;
 		lh->font = & LABELS_FONT_DEFAULT;
-		lh->height_pix = lh->font->height;
+		lh->height_pix = get_strheight(lh->font);
 
 		strncpy(lh->name, obj_name, NAME_ARRAY_SIZE);
 		lh->width = va_arg(arg, uint32_t);
 		memset(lh->text, '*', lh->width);		// для совместимости, потом убрать
-		lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
+		lh->width_pix = get_strwidth(lh->text, lh->font);
 #if GUI_USE_CACHE
 		lh->cache = NULL;
 #endif /* GUI_USE_CACHE */
@@ -696,7 +696,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		tf->w_sim = va_arg(arg, uint32_t);
 		tf->h_str = va_arg(arg, uint32_t);
 		tf->direction = (tf_direction_t) va_arg(arg, uint32_t);
-		tf->font = va_arg(arg, gui_mono_font_t *);
+		tf->font = va_arg(arg, unifont_t *);
 		strncpy(tf->name, obj_name, NAME_ARRAY_SIZE);
 		tf->visible = 1;
 		tf->index = win->tf_count;
@@ -1004,9 +1004,9 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_STATE) lh->state = va_arg(arg, int);
 		else if (prop == GUI_OBJ_COLOR) lh->color = va_arg(arg, gui_color_t);
 		else if (prop == GUI_OBJ_FONT) {
-			lh->font = va_arg(arg, gui_mono_font_t *);
-			lh->height_pix = lh->font->height;
-			lh->width_pix = get_strwidth_mono(" ", lh->font) * lh->width;
+			lh->font = va_arg(arg, unifont_t *);
+			lh->height_pix = get_strheight(lh->font);
+			lh->width_pix = get_strwidth(lh->text, lh->font);
 		}
 
 #if GUI_USE_CACHE
@@ -1031,7 +1031,7 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_SIZE) { bh->w = va_arg(arg, int); bh->h = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_REPEAT) bh->is_repeating = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_LONG_PRESS) bh->is_long_press = !! va_arg(arg, int);
-		else if (prop == GUI_OBJ_FONT) bh->font = va_arg(arg, gui_prop_font_t *);
+		else if (prop == GUI_OBJ_FONT) bh->font = va_arg(arg, unifont_t *);
 
 #if GUI_USE_CACHE
 		if (prop & NEED_INVALIDATION_MASK) gui_objects_cache_invalidate(bh->cache);
