@@ -9,3 +9,4 @@
 #include "gui_user.h"
 #include "gui_sdl2_api.h"
 #include "gui_sdl2_text.h"
+#include "gui_sdl2_input.h"

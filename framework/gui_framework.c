@@ -1,7 +1,7 @@
 // Simple GUI от RA4ASN
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if SIMPLE_GUI
 
 #include "gui_includes.h"
 
@@ -311,6 +311,16 @@ void * find_gui_obj(obj_type_t type, window_t * win, const char * name)
 		goto not_found;
 		break;
 
+	case TYPE_CANVAS:
+		for (uint8_t i = 0; i < win->ca_count; i ++)
+		{
+			canvas_t * ca = & win->ca_ptr[i];
+			if (! strcmp(ca->name, obj_name))
+				return (canvas_t *) ca;
+		}
+		goto not_found;
+		break;
+
 	default:
 		GUI_DEBUG_PRINT("%s: undefined type %d\n", __func__, type);
 		GUI_ASSERT(0);
@@ -453,6 +463,13 @@ static int hit_test(uint16_t px, uint16_t py,
 	return 0;
 }
 
+/* Отрисовка фоновых canvas-слоёв окна (до контента и графики). */
+static void draw_window_canvases(window_t * win)
+{
+	for (uint8_t i = 0; i < win->ca_count; i++)
+		if (win->ca_ptr[i].visible) draw_canvas(&win->ca_ptr[i]);
+}
+
 /* Отрисовка всех видимых элементов окна в прямом порядке типов. */
 static void draw_window_objects(window_t * win)
 {
@@ -580,6 +597,7 @@ static void set_state_record(window_t * win, obj_type_t type, void * link, uint8
 		break;
 
 	case TYPE_TEXT_FIELD:
+	case TYPE_CANVAS:
 		break;
 
 	default:
@@ -690,8 +708,13 @@ int gui_initialize (uint16_t screen_w, uint16_t screen_h)
 
 	gui_objects_init();
 	gui_sdl2_text_init();
+#if GUI_SDL2_INPUT
+	gui_sdl2_input_init();
+#endif /* GUI_SDL2_INPUT */
 
-	open_window(get_win(WINDOW_MAIN));
+	window_t * win = get_win(WINDOW_MAIN);
+	open_window(win);
+	win->onVisibleProcess();
 	gui_user_init();
 
 	inited = 1;
@@ -712,7 +735,12 @@ void process_gui(void)
 	static uint8_t is_repeating = 0, repeating_cnt = 0;
 	if (!inited) return;
 
-	if (__gui_get_touch_event(&tx, &ty))
+#if GUI_SDL2_INPUT
+    gui_sdl2_input_poll();
+    if (gui_sdl2_input_get(&tx, &ty))
+#else
+    if (__gui_get_touch_event(&tx, &ty))
+#endif
 	{
 		gui.last_pressed_x = tx;
 		gui.last_pressed_y = ty;
@@ -841,6 +869,7 @@ void process_gui(void)
 			else
 			{
 				draw_window(win);
+				draw_window_canvases(win);
 				win->onVisibleProcess();					// запуск процедуры фоновой обработки для окна
 				draw_window_objects(win);					// отрисовка принадлежащих окну элементов напрямую из его массивов
 			}
@@ -849,4 +878,4 @@ void process_gui(void)
 	TIME_PROFILE_STOP(gui, "");
 }
 
-#endif /* WITHTOUCHGUI */
+#endif /* SIMPLE_GUI */

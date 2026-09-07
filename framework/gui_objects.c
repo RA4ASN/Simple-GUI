@@ -2,7 +2,7 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if SIMPLE_GUI
 
 #include "gui_includes.h"
 
@@ -69,12 +69,12 @@ void draw_label(label_t * lh)
 
 //	__gui_draw_rect(x, y, lh->bbox_w, lh->bbox_h, GUI_COLOR_YELLOW, 0);
 
-	if	(lh->bbox_align == ALIGNMENT_CENTER)
+	if (lh->bbox_align == ALIGNMENT_CENTER)
 		xx += (lh->bbox_w / 2) - (lh->width_text_pix / 2);
-	else if	(lh->bbox_align == ALIGNMENT_RIGHT)
+	else if (lh->bbox_align == ALIGNMENT_RIGHT)
 		xx += lh->bbox_w - lh->width_text_pix;
 
-	gui_sdl2_draw_text(lh->text, xx, y, lh->font, lh->color);
+    gui_sdl2_draw_text_colored(lh->text, xx, y, lh->font, lh->color);
 }
 
 // *************** Buttons ****************
@@ -146,6 +146,40 @@ void draw_close_button(button_t * bh)
 	__gui_draw_rect(x, y, w, h, GUI_COLOR_BLACK, 0);
 	__gui_draw_line(x, y, x + w, y + h, GUI_COLOR_BLACK);
 	__gui_draw_line(x, y + h, x + w, y, GUI_COLOR_BLACK);
+}
+
+// *************** Canvas ****************
+void draw_canvas(canvas_t * ca)
+{
+	window_t * win = get_win(ca->parent);
+
+	uint16_t x = win->draw_x1 + ca->x;
+	uint16_t y = win->draw_y1 + ca->y;
+	uint8_t alpha = (ca->color >> 24) & 0xFF;
+
+	if (ca->background)
+		__gui_draw_semitransparent_rect(x, y, x + ca->w - 1, y + ca->h - 1,
+				ca->color, alpha);
+
+	if (ca->border)
+		__gui_draw_rect(x, y, ca->w, ca->h, GUI_COLOR_GRAY, 0);
+}
+
+void gui_canvas_set_active(const char * name)
+{
+	window_t * win = get_win(get_current_drawing_window());
+	win->ca_current = find_gui_obj(TYPE_CANVAS, win, name);
+}
+
+void gui_canvas_print(const char * text, int x, int y, TTF_Font * font, gui_color_t color)
+{
+	window_t * win = get_win(get_current_drawing_window());
+	canvas_t * ca = win->ca_current;
+	if (ca == NULL)
+		return;
+
+	gui_sdl2_draw_text(text, win->draw_x1 + ca->x + x, win->draw_y1 + ca->y + y,
+			font, color);
 }
 
 // *************** Text fields ***************
@@ -291,6 +325,8 @@ static obj_type_t parse_obj_name(const char * name)
 		return TYPE_TOUCH_AREA;
 	else if (! strncmp(name, "tf_", 3))
 		return TYPE_TEXT_FIELD;
+	else if (! strncmp(name, "ca_", 3))
+		return TYPE_CANVAS;
 	else
 	{
 		GUI_DEBUG_PRINT("Unrecognized GUI object type: %s\n", name);
@@ -352,6 +388,29 @@ uint8_t gui_obj_create(const char * name, ...)
 
 	switch (type)
 	{
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca_tmp = (canvas_t *) realloc(win->ca_ptr, sizeof(canvas_t) * (win->ca_count + 1));
+		GUI_MEM_ASSERT(ca_tmp);
+		win->ca_ptr = ca_tmp;
+		canvas_t * ca = & win->ca_ptr[win->ca_count];
+		memset(ca, 0, sizeof(canvas_t));
+		ca->parent = window_id;
+		ca->w = va_arg(arg, int);
+		ca->h = va_arg(arg, int);
+		ca->color = (GUI_COLOR_DARKGRAY & 0x00FFFFFF) | ((uint32_t) DEFAULT_ALPHA << 24);
+		ca->visible = 1;
+		ca->border = 0;
+		ca->background = 0;
+		ca->index = win->ca_count;
+		ca->x = 0;
+		ca->y = 0;
+		strncpy(ca->name, obj_name, NAME_ARRAY_SIZE);
+		idx = win->ca_count;
+		win->ca_count ++;
+		break;
+	}
+
 	case TYPE_LABEL:
 	{
 		label_t * lh_tmp = (label_t *) realloc(win->lh_ptr, sizeof(label_t) * (win->lh_count + 1));   // 1.2
@@ -525,57 +584,65 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 	obj_type_t type2 = parse_obj_name(name2);
 	void * oh1 = find_gui_obj(type1, win, name1);
 	void * oh2 = find_gui_obj(type2, win, name2);
-
 	if (oh1 == oh2)
 		return;
-
 	uint16_t x2 = 0, y2 = 0, w2 = 0, h2 = 0, baseline2 = 0;
-
 	switch(type2)
 	{
 	case TYPE_LABEL:
+	{
 		label_t * lh2 = (label_t *) oh2;
 		x2 = lh2->x;
 		y2 = lh2->y;
 		w2 = get_label_width(lh2);
 		h2 = get_label_height(lh2);
 		baseline2 = lh2->baseline;
-
 		break;
-
+	}
 	case TYPE_BUTTON:
+	{
 		button_t * bh2 = (button_t *) oh2;
 		x2 = bh2->x1;
 		y2 = bh2->y1;
 		w2 = bh2->w;
 		h2 = bh2->h;
 		break;
-
+	}
 	case TYPE_TEXT_FIELD:
+	{
 		text_field_t * tf2 = (text_field_t *) oh2;
 		x2 = tf2->x1;
 		y2 = tf2->y1;
 		w2 = tf2->w;
 		h2 = tf2->h;
 		break;
-
+	}
 	case TYPE_SLIDER:
+	{
 		slider_t * sh2 = (slider_t *) oh2;
 		x2 = sh2->x;
 		y2 = sh2->y;
 		w2 = sh2->width;
 		h2 = sh2->height;
 		break;
-
+	}
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca2 = (canvas_t *) oh2;
+		x2 = ca2->x;
+		y2 = ca2->y;
+		w2 = ca2->w;
+		h2 = ca2->h;
+		break;
+	}
 	default:
 		break;
 	}
-
 	switch(type1)
 	{
 	case TYPE_LABEL:
+	{
 		label_t * lh1 = (label_t *) oh1;
-
 		if (align == ALIGN_RIGHT_UP) { lh1->x = x2 + w2 + offset; lh1->y = y2; }
 		else if (align == ALIGN_RIGHT_UP_MID) { lh1->x = x2 + w2 + offset; lh1->y = y2 + (h2 / 2 - get_label_height(lh1) / 2); }
 		else if (align == ALIGN_LEFT_UP)  { lh1->x = x2 - get_label_width(lh1) - offset; lh1->y = y2; }
@@ -584,12 +651,11 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 		else if (align == ALIGN_DOWN_RIGHT) { lh1->x = x2 + w2 - get_label_width(lh1); lh1->y = y2 + h2 + offset; }
 		else if (align == ALIGN_LEFT_TOP) { lh1->x = x2; lh1->y = y2 - get_label_height(lh1) - offset; }
 		else if (align == ALIGN_RIGHT_DOWN) { lh1->x = x2 + w2 + offset; lh1->y = y2 + baseline2 - lh1->baseline; }
-
 		break;
-
+	}
 	case TYPE_BUTTON:
+	{
 		button_t * bh1 = (button_t *) oh1;
-
 		if (align == ALIGN_RIGHT_UP) { bh1->x1 = x2 + w2 + offset; bh1->y1 = y2; }
 		else if (align == ALIGN_RIGHT_UP_MID) { bh1->x1 = x2 + w2 + offset; bh1->y1 = y2 + (h2 / 2 - bh1->h / 2); }
 		else if (align == ALIGN_LEFT_UP)  { bh1->x1 = x2 - bh1->w - offset; bh1->y1 = y2; }
@@ -597,10 +663,10 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 		else if (align == ALIGN_DOWN_MID) { bh1->x1 = x2 + w2 / 2 - bh1->w / 2; bh1->y1 = y2 + h2 + offset; }
 		else if (align == ALIGN_DOWN_RIGHT) { bh1->x1 = x2 + w2 - bh1->w; bh1->y1 = y2 + h2 + offset; }
 		break;
-
+	}
 	case TYPE_SLIDER:
+	{
 		slider_t * sh1 = (slider_t *) oh1;
-
 		if (align == ALIGN_RIGHT_UP) { sh1->x = x2 + w2 + offset; sh1->y = y2; }
 		else if (align == ALIGN_RIGHT_UP_MID) { sh1->x = x2 + w2 + offset; sh1->y = y2 + (h2 / 2 - sh1->height / 2); }
 		else if (align == ALIGN_LEFT_UP)  { sh1->x = x2 - sh1->width - offset; sh1->y = y2; }
@@ -608,7 +674,18 @@ void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t
 		else if (align == ALIGN_DOWN_MID) { sh1->x = x2 + w2 / 2 - sh1->width / 2; sh1->y = y2 + h2 + offset; }
 		else if (align == ALIGN_DOWN_RIGHT) { sh1->x = x2 + w2 - sh1->width; sh1->y = y2 + h2 + offset; }
 		break;
-
+	}
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca1 = (canvas_t *) oh1;
+		if (align == ALIGN_RIGHT_UP) { ca1->x = x2 + w2 + offset; ca1->y = y2; }
+		else if (align == ALIGN_RIGHT_UP_MID) { ca1->x = x2 + w2 + offset; ca1->y = y2 + (h2 / 2 - ca1->h / 2); }
+		else if (align == ALIGN_LEFT_UP) { ca1->x = x2 - ca1->w - offset; ca1->y = y2; }
+		else if (align == ALIGN_DOWN_LEFT) { ca1->x = x2; ca1->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_MID) { ca1->x = x2 + w2 / 2 - ca1->w / 2; ca1->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_RIGHT) { ca1->x = x2 + w2 - ca1->w; ca1->y = y2 + h2 + offset; }
+		break;
+	}
 	default:
 		break;
 	}
@@ -642,24 +719,25 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 	window_t * win = get_win(get_parent_window());
 	obj_type_t type = parse_obj_name(name);
 	void * obj = find_gui_obj(type, win, name);
-
 	switch(type)
 	{
 	case TYPE_LABEL:
+	{
 		label_t * lh = (label_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) return lh->visible;
 		else if (prop == GUI_OBJ_POS_X) return lh->x;
 		else if (prop == GUI_OBJ_POS_Y) return lh->y;
 		else if (prop == GUI_OBJ_PAYLOAD) return lh->payload;
 		else if (prop == GUI_OBJ_STATE) return lh->state;
-		else if (prop == GUI_OBJ_ALIGN) return lh->bbox_align;        /* + было только в set */
-		else if (prop == GUI_OBJ_COLOR) return (int) lh->color;       /* + было только в set */
+		else if (prop == GUI_OBJ_ALIGN) return lh->bbox_align;
+		else if (prop == GUI_OBJ_COLOR) return (int) lh->color;
 		else if (prop == GUI_OBJ_WIDTH) return lh->bbox_w;
 		else if (prop == GUI_OBJ_HEIGHT) return lh->bbox_h;
 		else if (prop == GUI_OBJ_INDEX) return lh->index;
 		break;
-
+	}
 	case TYPE_BUTTON:
+	{
 		button_t * bh = (button_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) return bh->visible;
 		else if (prop == GUI_OBJ_POS_X) return bh->x1;
@@ -667,15 +745,15 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_PAYLOAD) return bh->payload;
 		else if (prop == GUI_OBJ_STATE) return bh->state;
 		else if (prop == GUI_OBJ_LOCK) return bh->is_locked;
-		else if (prop == GUI_OBJ_REPEAT) return bh->is_repeating;     /* + было только в set */
-		else if (prop == GUI_OBJ_LONG_PRESS) return bh->is_long_press;/* + было только в set */
+		else if (prop == GUI_OBJ_REPEAT) return bh->is_repeating;
+		else if (prop == GUI_OBJ_LONG_PRESS) return bh->is_long_press;
 		else if (prop == GUI_OBJ_WIDTH) return bh->w;
 		else if (prop == GUI_OBJ_HEIGHT) return bh->h;
 		else if (prop == GUI_OBJ_INDEX) return bh->index;
-		/* GUI_OBJ_FONT намеренно не читается: это указатель, в int не помещается. */
 		break;
-
+	}
 	case TYPE_SLIDER:
+	{
 		slider_t * sh = (slider_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) return sh->visible;
 		else if (prop == GUI_OBJ_POS_X) return sh->x;
@@ -687,34 +765,49 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_SIZE) return sh->size;
 		else if (prop == GUI_OBJ_INDEX) return sh->index;
 		break;
-
+	}
 	case TYPE_TOUCH_AREA:
+	{
 		touch_area_t * ta = (touch_area_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) return ta->visible;
 		else if (prop == GUI_OBJ_POS_X) return ta->x1;
 		else if (prop == GUI_OBJ_POS_Y) return ta->y1;
 		else if (prop == GUI_OBJ_PAYLOAD) return ta->payload;
-		else if (prop == GUI_OBJ_STATE) return ta->state;             /* + отсутствовало */
-		else if (prop == GUI_OBJ_WIDTH) return ta->w;                 /* + отсутствовало */
-		else if (prop == GUI_OBJ_HEIGHT) return ta->h;                /* + отсутствовало */
+		else if (prop == GUI_OBJ_STATE) return ta->state;
+		else if (prop == GUI_OBJ_WIDTH) return ta->w;
+		else if (prop == GUI_OBJ_HEIGHT) return ta->h;
 		else if (prop == GUI_OBJ_INDEX) return ta->index;
 		break;
-
+	}
 	case TYPE_TEXT_FIELD:
+	{
 		text_field_t * tf = (text_field_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) return tf->visible;
 		else if (prop == GUI_OBJ_POS_X) return tf->x1;
 		else if (prop == GUI_OBJ_POS_Y) return tf->y1;
-		else if (prop == GUI_OBJ_STATE) return tf->state;             /* + отсутствовало */
+		else if (prop == GUI_OBJ_STATE) return tf->state;
 		else if (prop == GUI_OBJ_WIDTH) return tf->w;
 		else if (prop == GUI_OBJ_HEIGHT) return tf->h;
 		else if (prop == GUI_OBJ_INDEX) return tf->index;
 		break;
-
+	}
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca = (canvas_t *) obj;
+		if (prop == GUI_OBJ_VISIBLE) return ca->visible;
+		else if (prop == GUI_OBJ_POS_X) return ca->x;
+		else if (prop == GUI_OBJ_POS_Y) return ca->y;
+		else if (prop == GUI_OBJ_COLOR) return (int) ca->color;
+		else if (prop == GUI_OBJ_WIDTH) return ca->w;
+		else if (prop == GUI_OBJ_HEIGHT) return ca->h;
+		else if (prop == GUI_OBJ_STATE) return ca->state;
+		else if (prop == GUI_OBJ_BORDER) return ca->border;
+		else if (prop == GUI_OBJ_INDEX) return ca->index;
+		break;
+	}
 	default:
 		break;
 	}
-
 	return 0;
 }
 
@@ -794,41 +887,42 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 	uint8_t flag = 0;
 	va_list arg;
 	va_start(arg, prop);
-
 	switch(type)
 	{
 	case TYPE_LABEL:
+	{
 		label_t * lh = (label_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) lh->visible = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_X) lh->x = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_Y) lh->y = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { lh->x = va_arg(arg, int); lh->y = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_PAYLOAD) lh->payload = va_arg(arg, int);
-		else if (prop == GUI_OBJ_TEXT || prop == GUI_OBJ_TEXT_FMT) {
-		    char tmp[TEXT_ARRAY_SIZE];
-		    if (prop == GUI_OBJ_TEXT) {
-		        const char * s = va_arg(arg, char *);
-		        strncpy(tmp, s, TEXT_ARRAY_SIZE - 1);
-		        tmp[TEXT_ARRAY_SIZE - 1] = '\0';
-		    } else {
-		        vsnprintf(tmp, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
-		        tmp[TEXT_ARRAY_SIZE - 1] = '\0';
-		    }
-		    if (strcmp(tmp, lh->text) != 0) {            // текст реально изменился
-		        gui_sdl2_invalidate_text(lh->text, lh->font);   // инвалидируем СТАРЫЙ текст
-		        strcpy(lh->text, tmp);                          // пишем новый
-		        flag = 1;
-		    }
-		    /* если тексты равны — ничего не делаем: кэш остаётся валидным,
-		       TTF_SizeText ниже не вызывается, перерисовка текста не нужна */
-		}
+        else if (prop == GUI_OBJ_TEXT || prop == GUI_OBJ_TEXT_FMT) {
+            char tmp[TEXT_ARRAY_SIZE];
+            if (prop == GUI_OBJ_TEXT) {
+                const char * s = va_arg(arg, char *);
+                strncpy(tmp, s, TEXT_ARRAY_SIZE - 1);
+                tmp[TEXT_ARRAY_SIZE - 1] = '\0';
+            } else {
+                vsnprintf(tmp, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
+                tmp[TEXT_ARRAY_SIZE - 1] = '\0';
+            }
+
+            // Сравниваем с сырым текстом (который может содержать маркеры)
+            if (strcmp(tmp, lh->text) != 0) {
+                // Инвалидируем кэш для СТАРОГО текста
+                gui_sdl2_invalidate_text(lh->text, lh->font);
+
+                // Сохраняем новый текст (с маркерами)
+                strcpy(lh->text, tmp);
+                flag = 1;
+            }
+        }
 		else if (prop == GUI_OBJ_STATE) lh->state = va_arg(arg, int);
 		else if (prop == GUI_OBJ_ALIGN) lh->bbox_align = va_arg(arg, int);
 		else if (prop == GUI_OBJ_COLOR) lh->color = va_arg(arg, gui_color_t);
 		else if (prop == GUI_OBJ_FONT) { flag = 1;
-			// Инвалидируем кэш для старого шрифта
 			gui_sdl2_invalidate_text(lh->text, lh->font);
-			// Закрываем старый динамический шрифт
 			if (lh->font_owned && lh->font) {
 				TTF_CloseFont(lh->font);
 				lh->font = NULL;
@@ -843,30 +937,29 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 				lh->font_owned = 0;
 			}
 		}
+        if (flag)
+        {
+            int w, h;
+            gui_sdl2_get_text_size_colored(lh->text, lh->font, &w, &h);
 
-		if (flag)
-		{
-			// Пересчитываем ТОЛЬКО width_text_pix (реальная ширина текущего текста)
-			// bbox_w и bbox_h пересчитываем ТОЛЬКО при смене шрифта
-			int w, h;
-			TTF_SizeText(lh->font, lh->text, &w, &h);
-			lh->width_text_pix = w;
-			lh->baseline = TTF_FontAscent(lh->font);
-			lh->bbox_h = h;  // высота шрифта не зависит от текста
-			// bbox_w пересчитываем только при смене шрифта (prop == GUI_OBJ_FONT)
-			// При смене текста bbox_w остаётся неизменным!
-			if (prop == GUI_OBJ_FONT) {
-				char widest[TEXT_ARRAY_SIZE];
-				memset(widest, '0', lh->width);
-				widest[lh->width] = '\0';
-				int ww, wh;
-				TTF_SizeText(lh->font, widest, &ww, &wh);
-				lh->bbox_w = ww;
-			}
-		}
+            lh->width_text_pix = w;
+            lh->baseline = TTF_FontAscent(lh->font);
+            lh->bbox_h = h;
+
+            // bbox_w (максимальная ширина поля) пересчитываем только при смене шрифта
+            if (prop == GUI_OBJ_FONT) {
+                char widest[TEXT_ARRAY_SIZE];
+                memset(widest, '0', lh->width);
+                widest[lh->width] = '\0';
+                int ww, wh;
+                TTF_SizeText(lh->font, widest, &ww, &wh);
+                lh->bbox_w = ww;
+            }
+        }
 		break;
-
+	}
 	case TYPE_BUTTON:
+	{
 		button_t * bh = (button_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) bh->visible = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_X) bh->x1 = va_arg(arg, int);
@@ -884,19 +977,21 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_LONG_PRESS) bh->is_long_press = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_FONT) { bh->font = va_arg(arg, TTF_Font *); }
 		break;
-
+	}
 	case TYPE_SLIDER:
+	{
 		slider_t * sh = (slider_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) sh->visible = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_X) sh->x = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_Y) sh->y = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { sh->x = va_arg(arg, int); sh->y = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_PAYLOAD) sh->value = va_arg(arg, int);
-		else if (prop == GUI_OBJ_STATE) sh->state = va_arg(arg, int);   /* + читалось, но не писалось */
-		else if (prop == GUI_OBJ_SIZE) sh->size = va_arg(arg, int);     /* + читалось, но не писалось */
+		else if (prop == GUI_OBJ_STATE) sh->state = va_arg(arg, int);
+		else if (prop == GUI_OBJ_SIZE) sh->size = va_arg(arg, int);
 		break;
-
-	case TYPE_TOUCH_AREA:                                                /* + case отсутствовал целиком */
+	}
+	case TYPE_TOUCH_AREA:
+	{
 		touch_area_t * ta = (touch_area_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) ta->visible = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_X) ta->x1 = va_arg(arg, int);
@@ -908,14 +1003,15 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_HEIGHT) ta->h = va_arg(arg, int);
 		else if (prop == GUI_OBJ_SIZE) { ta->w = va_arg(arg, int); ta->h = va_arg(arg, int); }
 		break;
-
+	}
 	case TYPE_TEXT_FIELD:
+	{
 		text_field_t * tf = (text_field_t *) obj;
 		if (prop == GUI_OBJ_VISIBLE) tf->visible = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_X) tf->x1 = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_Y) tf->y1 = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { tf->x1 = va_arg(arg, int); tf->y1 = va_arg(arg, int); }
-		else if (prop == GUI_OBJ_STATE) tf->state = va_arg(arg, int);   /* + отсутствовало */
+		else if (prop == GUI_OBJ_STATE) tf->state = va_arg(arg, int);
 		else if (prop == GUI_OBJ_TEXT) {
 			tf_entry_t * rec = &  tf->string[tf->index];
 			strncpy(rec->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
@@ -935,11 +1031,26 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 			memset(tf->string, 0, tf->h_str * sizeof(tf_entry_t));
 		}
 		break;
-
+	}
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca = (canvas_t *) obj;
+		if (prop == GUI_OBJ_VISIBLE) ca->visible = !! va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_X) ca->x = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_Y) ca->y = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS) { ca->x = va_arg(arg, int); ca->y = va_arg(arg, int); }
+		else if (prop == GUI_OBJ_COLOR) ca->color = va_arg(arg, gui_color_t);
+		else if (prop == GUI_OBJ_WIDTH) ca->w = va_arg(arg, int);
+		else if (prop == GUI_OBJ_HEIGHT) ca->h = va_arg(arg, int);
+		else if (prop == GUI_OBJ_SIZE) { ca->w = va_arg(arg, int); ca->h = va_arg(arg, int); }
+		else if (prop == GUI_OBJ_STATE) ca->state = va_arg(arg, int);
+		else if (prop == GUI_OBJ_BORDER) ca->border = !! va_arg(arg, int);
+		else if (prop == GUI_OBJ_BACK) ca->background = !! va_arg(arg, int);
+		break;
+	}
 	default:
 		break;
 	}
-
 	va_end(arg);
 }
 
@@ -948,39 +1059,41 @@ uint8_t gui_check_obj(const char * name1, const char * name2)
 	return strcmp(name1, name2) == 0;
 }
 
-// выравнивание однотипных объектов (кнопка, метка, слайдер) с передачей массива имен объектов
-void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uint8_t cols, uint8_t interval)
+static uint8_t get_obj_idx_by_name(window_t * win, obj_type_t type, const char * name)
+{
+	void * p = find_gui_obj(type, win, name);
+	if (type == TYPE_BUTTON)
+		return ((button_t *) p)->index;
+	else if (type == TYPE_LABEL)
+		return ((label_t *) p)->index;
+	else if (type == TYPE_SLIDER)
+		return ((slider_t *) p)->index;
+	else if (type == TYPE_CANVAS)
+		return ((canvas_t *) p)->index;
+	GUI_ASSERT(0);
+	return 0;
+}
+
+void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, uint8_t interval)
 {
 	if (count <= 1) return;
-
 	window_t * win = get_win(get_parent_window());
-
-	obj_type_t type = parse_obj_name(names[0]);
-	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER)
+	obj_type_t type = parse_obj_name(name);
+	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER && type != TYPE_CANVAS)
 	{
 		GUI_DEBUG_PRINT("%s: idx %d unsupported object type to arrange\n", __func__, 0);
 		GUI_ASSERT(0);
 	}
-
-	uint16_t x = gui_obj_get_int_prop(names[0], GUI_OBJ_POS_X);
-	uint16_t y = gui_obj_get_int_prop(names[0], GUI_OBJ_POS_Y);
-	uint16_t w = gui_obj_get_int_prop(names[0], GUI_OBJ_WIDTH);
-	uint16_t h = gui_obj_get_int_prop(names[0], GUI_OBJ_HEIGHT);
-
+	uint16_t x = gui_obj_get_int_prop(name, GUI_OBJ_POS_X);
+	uint16_t y = gui_obj_get_int_prop(name, GUI_OBJ_POS_Y);
+	uint16_t w = gui_obj_get_int_prop(name, GUI_OBJ_WIDTH);
+	uint16_t h = gui_obj_get_int_prop(name, GUI_OBJ_HEIGHT);
+	uint8_t idx = get_obj_idx_by_name(win, type, name) + 1;
 	for (int i = 1; i < count; i ++)
 	{
 		uint8_t row = i / cols;
 		uint8_t col = i % cols;
-
-		const char * obj = names[i];
-
-		obj_type_t typex = parse_obj_name(obj);
-		if (typex != type)
-		{
-			GUI_DEBUG_PRINT("%s: idx %d - arrange various objects not supported\n", __func__, i);
-			GUI_ASSERT(0);
-		}
-
+		const char * obj = get_obj_name_by_idx(type, idx ++);
 		gui_obj_set_prop(obj, GUI_OBJ_POS_X, x + (w + interval) * col);
 		gui_obj_set_prop(obj, GUI_OBJ_POS_Y, y + (h + interval) * row);
 	}
@@ -990,11 +1103,9 @@ char * get_obj_name_by_idx(obj_type_t type, uint8_t idx)
 {
 	window_t * win = get_win(get_parent_window());
 	static char obj_name[NAME_ARRAY_SIZE] = { 0 };
-
 	if (type == TYPE_BUTTON)
 	{
 		GUI_ASSERT(idx < win->bh_count);
-
 		strncpy(obj_name, win->bh_ptr[idx].name, NAME_ARRAY_SIZE);
 		obj_name_user(obj_name);
 		return obj_name;
@@ -1013,54 +1124,44 @@ char * get_obj_name_by_idx(obj_type_t type, uint8_t idx)
 		obj_name_user(obj_name);
 		return obj_name;
 	}
-
+	else if (type == TYPE_CANVAS)
+	{
+		GUI_ASSERT(idx < win->ca_count);
+		strncpy(obj_name, win->ca_ptr[idx].name, NAME_ARRAY_SIZE);
+		obj_name_user(obj_name);
+		return obj_name;
+	}
 	GUI_ASSERT(0);
 	return NULL;
 }
 
-static uint8_t get_obj_idx_by_name(window_t * win, obj_type_t type, const char * name)
-{
-	void * p = find_gui_obj(type, win, name);
-
-	if (type == TYPE_BUTTON)
-		return ((button_t *) p)->index;
-	else if (type == TYPE_LABEL)
-		return ((label_t *) p)->index;
-	else if (type == TYPE_SLIDER)
-		return ((slider_t *) p)->index;
-
-	GUI_ASSERT(0);
-	return 0;
-}
-
 // выравнивание однотипных объектов (кнопка, метка, слайдер) с передачей имени первого объекта,
 // обработка по возрастанию индекса (в порядке создания)
-void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, uint8_t interval)
+void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uint8_t cols, uint8_t interval)
 {
 	if (count <= 1) return;
-
 	window_t * win = get_win(get_parent_window());
-
-	obj_type_t type = parse_obj_name(name);
-	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER)
+	obj_type_t type = parse_obj_name(names[0]);
+	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER && type != TYPE_CANVAS)
 	{
 		GUI_DEBUG_PRINT("%s: idx %d unsupported object type to arrange\n", __func__, 0);
 		GUI_ASSERT(0);
 	}
-
-	uint16_t x = gui_obj_get_int_prop(name, GUI_OBJ_POS_X);
-	uint16_t y = gui_obj_get_int_prop(name, GUI_OBJ_POS_Y);
-	uint16_t w = gui_obj_get_int_prop(name, GUI_OBJ_WIDTH);
-	uint16_t h = gui_obj_get_int_prop(name, GUI_OBJ_HEIGHT);
-	uint8_t idx = get_obj_idx_by_name(win, type, name) + 1;
-
+	uint16_t x = gui_obj_get_int_prop(names[0], GUI_OBJ_POS_X);
+	uint16_t y = gui_obj_get_int_prop(names[0], GUI_OBJ_POS_Y);
+	uint16_t w = gui_obj_get_int_prop(names[0], GUI_OBJ_WIDTH);
+	uint16_t h = gui_obj_get_int_prop(names[0], GUI_OBJ_HEIGHT);
 	for (int i = 1; i < count; i ++)
 	{
 		uint8_t row = i / cols;
 		uint8_t col = i % cols;
-
-		const char * obj = get_obj_name_by_idx(type, idx ++);
-
+		const char * obj = names[i];
+		obj_type_t typex = parse_obj_name(obj);
+		if (typex != type)
+		{
+			GUI_DEBUG_PRINT("%s: idx %d - arrange various objects not supported\n", __func__, i);
+			GUI_ASSERT(0);
+		}
 		gui_obj_set_prop(obj, GUI_OBJ_POS_X, x + (w + interval) * col);
 		gui_obj_set_prop(obj, GUI_OBJ_POS_Y, y + (h + interval) * row);
 	}
@@ -1071,4 +1172,4 @@ void gui_objects_init(void)
 
 }
 
-#endif /* WITHTOUCHGUI */
+#endif /* SIMPLE_GUI */

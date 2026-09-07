@@ -23,7 +23,9 @@ SDL_Renderer * sdl2_get_renderer(void);
 	)
 
 #define GUI_DEFAULTCOLOR            	0   // fully transparent color
+#define GUI_COLOR_RED 					GUI_TFTRGB(0xFF, 0x00, 0x00)
 #define GUI_COLOR_GREEN 				GUI_TFTRGB(0x00, 0xFF, 0x00)
+#define GUI_COLOR_BLUE	 				GUI_TFTRGB(0x00, 0x00, 0xFF)
 #define GUI_COLOR_DARKGRAY              GUI_TFTRGB(0x80, 0x80, 0x80)
 #define GUI_COLOR_YELLOW                GUI_TFTRGB(0xFF, 0xFF, 0x00)
 #define GUI_COLOR_WHITE                 GUI_TFTRGB(0xFF, 0xFF, 0xFF)
@@ -225,17 +227,14 @@ static inline void __gui_draw_point(unsigned int x, unsigned int y, gui_color_t 
 }
 
 static inline void __gui_draw_semitransparent_rect(unsigned int x1, unsigned int y1,
-		unsigned int x2, unsigned int y2, unsigned int alpha)
+	unsigned int x2, unsigned int y2, gui_color_t color, unsigned int alpha)
 {
 	SDL_Renderer * renderer = sdl2_get_renderer();
-
-	uint8_t r = (GUI_COLOR_DARKGRAY >> 16) & 0xFF;
-	uint8_t g = (GUI_COLOR_DARKGRAY >> 8) & 0xFF;
-	uint8_t b = (GUI_COLOR_DARKGRAY >> 0) & 0xFF;
-	uint8_t a = (uint8_t)alpha;
-
-	SDL_Rect rect = { .x = x1, .y = y1, .w = (x2 - x1), .h = (y2 - y1)};
-
+	uint8_t r = (color >> 16) & 0xFF;
+	uint8_t g = (color >> 8) & 0xFF;
+	uint8_t b = (color >> 0) & 0xFF;
+	uint8_t a = (uint8_t) alpha;
+	SDL_Rect rect = { .x = x1, .y = y1, .w = (x2 - x1), .h = (y2 - y1) };
 	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
 	SDL_SetRenderDrawColor(renderer, r, g, b, a);
 	SDL_RenderFillRect(renderer, & rect);

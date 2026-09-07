@@ -42,6 +42,14 @@ void gui_drawrect_rounded(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, ui
 void gui_drawrect_transparent(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t alpha);
 void gui_drawDashedRectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t dashLength, gui_color_t color);
 
+void gui_canvas_draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, gui_color_t color);
+void gui_canvas_draw_rect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, gui_color_t color, uint8_t fill);
+void gui_canvas_draw_rect(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, gui_color_t color, uint8_t fill);
+void gui_canvas_draw_rect_rounded(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint8_t radius, gui_color_t color, uint8_t fill);
+void gui_canvas_draw_rect_transparent(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, gui_color_t color, uint8_t alpha);
+void gui_canvas_draw_point(uint16_t x, uint16_t y, gui_color_t color);
+void gui_canvas_draw_dashed_rectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t dashLength, gui_color_t color);
+
 void process_gui(void);
 
 #endif /* _gui_system_h */

@@ -28,7 +28,8 @@ typedef enum {
 	TYPE_SLIDER,
 	TYPE_CLOSE_BUTTON,
 	TYPE_TOUCH_AREA,
-	TYPE_TEXT_FIELD
+	TYPE_TEXT_FIELD,
+	TYPE_CANVAS
 } obj_type_t;
 
 enum {
@@ -115,7 +116,9 @@ typedef enum {
 	GUI_OBJ_WIDTH,
 	GUI_OBJ_HEIGHT,
 	GUI_OBJ_SIZE,
-	GUI_OBJ_CLEAN
+	GUI_OBJ_CLEAN,
+	GUI_OBJ_BORDER,
+	GUI_OBJ_BACK
 } object_prop_t;
 
 enum {
@@ -211,6 +214,21 @@ typedef struct {
 	uint16_t baseline;      	// расстояние от верха bbox до baseline (= TTF_FontAscent)
 } label_t;
 
+typedef struct {
+	uint8_t parent;
+	uint8_t state;
+	uint8_t visible;
+	uint8_t border;				/* 1 — рисовать контур 1px */
+	uint8_t background;			/* 1 — рисовать заливку фона */
+	char name[NAME_ARRAY_SIZE];
+	gui_color_t color;			/* фон, альфа в старшем байте */
+	uint8_t index;
+	uint16_t x;					/* координаты относительно draw_x1/draw_y1 */
+	uint16_t y;
+	uint16_t w;
+	uint16_t h;
+} canvas_t;
+
 typedef enum  {
 	ORIENTATION_VERTICAL,
 	ORIENTATION_HORIZONTAL
@@ -293,6 +311,9 @@ typedef struct {
 	uint8_t ta_count;
 	text_field_t * tf_ptr;
 	uint8_t tf_count;
+	canvas_t * ca_ptr;
+	uint8_t ca_count;
+	canvas_t * ca_current;			// выбранный canvas для отрисовки
 	button_t close_button;			// системная кнопка закрытия окна (встроена в окно, без глобального состояния)
 	wm_queue_t queue;
 	uint8_t first_call;				// признак первого вызова для различных инициализаций
@@ -310,6 +331,7 @@ typedef struct {
 	uint8_t is_moving;
 	int8_t idx_bh_focus;
 	uint8_t idx_bh_focus_old;
+
 } window_t;
 
 typedef struct {

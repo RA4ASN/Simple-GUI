@@ -5,7 +5,7 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if SIMPLE_GUI
 
 #define GUI_ETALON_W			800
 #define GUI_ETALON_H			480
@@ -59,6 +59,6 @@ enum {
 #define SMALL_BUTTON_STYLE		get_commonbtn_h(), get_commonbtn_h()
 #define LONG_BUTTON_STYLE		(get_commonbtn_w() + get_commonbtn_w() / 3), get_commonbtn_h()
 
-#endif /* WITHTOUCHGUI */
+#endif /* SIMPLE_GUI */
 
 #endif /* _gui_settings_h */

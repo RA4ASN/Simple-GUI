@@ -2,13 +2,15 @@
 
 #include "gui_user_include.h"
 
-#if WITHTOUCHGUI
+#if SIMPLE_GUI
 
 #include "gui_sdl2_text.h"
+#include "gui_includes.h"
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <stdlib.h>
 #include <limits.h>
-#include "gui_settings.h"
 
 //#define GUI_SDL2_TEXT_CACHE_STATS 1
 
@@ -330,4 +332,144 @@ void gui_sdl2_invalidate_text(const char* text, TTF_Font* font)
     }
 }
 
-#endif /* WITHTOUCHGUI */
+//void gui_sdl2_draw_text(const char* text, int x, int y, TTF_Font* font, gui_color_t color)
+void gui_sdl2_print(const char* text, int x, int y, TTF_Font* font, gui_color_t color)
+{
+	window_t * win = get_win(get_current_drawing_window());
+	gui_sdl2_draw_text(text, win->x1 + x, win->y1 + y, font, color);
+}
+
+/* =====================================================================
+   ЦВЕТОВАЯ РАЗМЕТКА ТЕКСТА
+   Формат маркеров:
+     /csRRGGBB  — установить цвет (ровно 6 hex-цифр RGB, альфа всегда 0xFF)
+     /cd        — сброс к цвету по умолчанию (default_color)
+     /ce        — игнорируется (совместимость с внешними форматами)
+   Всё остальное между маркерами — обычный текст, отрисовывается текущим цветом.
+   ===================================================================== */
+
+typedef void (*colored_seg_cb)(const char *seg, int len,
+                               gui_color_t color, void *ctx);
+
+/* Проверяет, что p[0..5] — валидные hex-цифры */
+static int is_hex6(const char *p)
+{
+    for (int i = 0; i < 6; i++)
+        if (!isxdigit((unsigned char)p[i])) return 0;
+    return 1;
+}
+
+/* Возвращает 1, если в позиции p стоит любой из маркеров /cs /cd /ce */
+static int is_marker(const char *p)
+{
+    return (p[0] == '/' && p[1] == 'c' &&
+           (p[2] == 's' || p[2] == 'd' || p[2] == 'e'));
+}
+
+/* Универсальный парсер: разбивает строку на сегменты (текст, цвет)
+   и вызывает cb для каждого текстового сегмента. */
+static void parse_colored_text(const char *text, gui_color_t default_color,
+                               colored_seg_cb cb, void *ctx)
+{
+    gui_color_t color = default_color;
+    const char *p = text;
+
+    while (*p)
+    {
+        /* /csRRGGBB — установка цвета, читаем РОВНО 6 hex-цифр */
+        if (p[0] == '/' && p[1] == 'c' && p[2] == 's' && is_hex6(p + 3))
+        {
+            char hex[7] = { p[3], p[4], p[5], p[6], p[7], p[8], '\0' };
+            uint32_t rgb = (uint32_t)strtoul(hex, NULL, 16);
+            color = 0xFF000000u | rgb;
+            p += 9;
+        }
+        /* /cd — сброс к цвету по умолчанию */
+        else if (p[0] == '/' && p[1] == 'c' && p[2] == 'd')
+        {
+            color = default_color;
+            p += 3;
+        }
+        /* /ce — игнорируется (не сбрасывает цвет) */
+        else if (p[0] == '/' && p[1] == 'c' && p[2] == 'e')
+        {
+            p += 3;
+        }
+        /* обычный текст до следующего маркера или конца строки */
+        else
+        {
+            const char *start = p;
+            while (*p && !is_marker(p))
+                p++;
+            if (p > start)
+                cb(start, (int)(p - start), color, ctx);
+        }
+    }
+}
+
+/* ---- callback для измерения ширины ---- */
+typedef struct { TTF_Font *font; int total_w; int max_h; } size_ctx_t;
+
+static void size_cb(const char *seg, int len, gui_color_t color, void *ctx)
+{
+    (void)color;
+    size_ctx_t *sc = (size_ctx_t *)ctx;
+    char tmp[TEXT_ARRAY_SIZE];
+    int n = len < TEXT_ARRAY_SIZE - 1 ? len : TEXT_ARRAY_SIZE - 1;
+    memcpy(tmp, seg, n);
+    tmp[n] = '\0';
+    int w = 0, h = 0;
+    gui_sdl2_get_text_size(tmp, sc->font, &w, &h);
+    sc->total_w += w;
+    if (h > sc->max_h) sc->max_h = h;
+}
+
+void gui_sdl2_get_text_size_colored(const char *text, TTF_Font *font,
+                                    int *w, int *h)
+{
+    if (!text || !font) { if (w) *w = 0; if (h) *h = 0; return; }
+    if (!gui_sdl2_has_color_markers(text)) {
+        gui_sdl2_get_text_size(text, font, w, h);
+        return;
+    }
+    size_ctx_t sc = { font, 0, 0 };
+    parse_colored_text(text, 0, size_cb, &sc);
+    if (w) *w = sc.total_w;
+    if (h) *h = sc.max_h;
+}
+
+/* ---- callback для отрисовки ---- */
+typedef struct { TTF_Font *font; int x, y; } draw_ctx_t;
+
+static void draw_cb(const char *seg, int len, gui_color_t color, void *ctx)
+{
+    draw_ctx_t *dc = (draw_ctx_t *)ctx;
+    char tmp[TEXT_ARRAY_SIZE];
+    int n = len < TEXT_ARRAY_SIZE - 1 ? len : TEXT_ARRAY_SIZE - 1;
+    memcpy(tmp, seg, n);
+    tmp[n] = '\0';
+    int w = 0, h = 0;
+    gui_sdl2_get_text_size(tmp, dc->font, &w, &h);
+    gui_sdl2_draw_text(tmp, dc->x, dc->y, dc->font, color);
+    dc->x += w;
+}
+
+void gui_sdl2_draw_text_colored(const char *text, int x, int y,
+                                TTF_Font *font, gui_color_t default_color)
+{
+    if (!text || !font) return;
+    if (!gui_sdl2_has_color_markers(text)) {
+        gui_sdl2_draw_text(text, x, y, font, default_color);
+        return;
+    }
+    draw_ctx_t dc = { font, x, y };
+    parse_colored_text(text, default_color, draw_cb, &dc);
+}
+
+int gui_sdl2_has_color_markers(const char *text)
+{
+    if (!text) return 0;
+    return (strstr(text, "/c") != NULL) ? 1 : 0;
+}
+
+#endif /* SIMPLE_GUI */
