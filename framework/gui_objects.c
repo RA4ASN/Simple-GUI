@@ -10,6 +10,11 @@ const label_t label_default = 	{ 0, CANCELLED, 0, NON_VISIBLE, "", "", GUI_COLOR
 const button_t button_default = { 0, 0, CANCELLED, BUTTON_NON_LOCKED, 0, 1, 0, 0, NON_VISIBLE, INT32_MAX, "", "", };
 const text_field_t tf_default = { 0, 0, CANCELLED, 0, NON_VISIBLE, UP, "", };
 const touch_area_t ta_default = { 0, 0, 0, 0, 0, "", 0, 0, 0, 0, 0, };
+const switch_t switch_default = { 0, CANCELLED, NON_VISIBLE, 0, "", "", 0,
+	GUI_COLOR_SWITCH_ON, GUI_COLOR_SWITCH_OFF, GUI_COLOR_SWITCH_KNOB,
+	SWITCH_CAPTION_LEFT,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL,
+	{ 0, 0, 0, 0, 0, GUI_EASE_LINEAR, 0 } };
 
 const gui_color_t btn_bg_colors[BG_COUNT] =
 		{
@@ -75,6 +80,100 @@ void draw_label(label_t * lh)
 		xx += lh->bbox_w - lh->width_text_pix;
 
     gui_sdl2_draw_text_colored(lh->text, xx, y, lh->font, lh->color);
+}
+
+// *************** Switches ****************
+
+/* Пересчёт метрик подписи и полного габарита переключателя.
+   Вызывается при создании, смене текста, позиции подписи и размеров тела. */
+static void switch_update_layout(switch_t * sw)
+{
+	int tw = 0, th = 0;
+	if (sw->font && sw->text[0])
+		gui_sdl2_get_text_size(sw->text, sw->font, &tw, &th);
+
+	sw->cap_w = (uint16_t) tw;
+	sw->cap_h = (uint16_t) th;
+
+	const uint16_t gap = sw->text[0] ? switch_caption_indent : 0;
+
+	switch (sw->caption_align)
+	{
+	case SWITCH_CAPTION_TOP:
+		sw->w = (sw->sw_w > sw->cap_w) ? sw->sw_w : sw->cap_w;
+		sw->h = sw->cap_h + gap + sw->sw_h;
+		sw->cap_x = (sw->w - sw->cap_w) / 2;
+		sw->cap_y = 0;
+		sw->pill_x = (sw->w - sw->sw_w) / 2;		// тело по середине текстовой строки
+		sw->pill_y = sw->cap_h + gap;
+		break;
+
+	case SWITCH_CAPTION_BOTTOM:
+		sw->w = (sw->sw_w > sw->cap_w) ? sw->sw_w : sw->cap_w;
+		sw->h = sw->sw_h + gap + sw->cap_h;
+		sw->pill_x = (sw->w - sw->sw_w) / 2;		// тело по середине текстовой строки
+		sw->pill_y = 0;
+		sw->cap_x = (sw->w - sw->cap_w) / 2;
+		sw->cap_y = sw->sw_h + gap;
+		break;
+
+	case SWITCH_CAPTION_RIGHT:
+		sw->w = sw->sw_w + gap + sw->cap_w;
+		sw->h = (sw->sw_h > sw->cap_h) ? sw->sw_h : sw->cap_h;
+		sw->pill_x = 0;
+		sw->pill_y = (sw->h - sw->sw_h) / 2;
+		sw->cap_x = sw->sw_w + gap;
+		sw->cap_y = (sw->h - sw->cap_h) / 2;
+		break;
+
+	case SWITCH_CAPTION_LEFT:
+	default:
+		sw->w = sw->cap_w + gap + sw->sw_w;
+		sw->h = (sw->sw_h > sw->cap_h) ? sw->sw_h : sw->cap_h;
+		sw->cap_x = 0;
+		sw->cap_y = (sw->h - sw->cap_h) / 2;
+		sw->pill_x = sw->cap_w + gap;
+		sw->pill_y = (sw->h - sw->sw_h) / 2;
+		break;
+	}
+}
+
+/* Отрисовка переключателя (таблетка с ползунком и подписью) с анимацией */
+void draw_switch(switch_t * sw)
+{
+	window_t * win = get_win(sw->parent);
+	gui_anim_update(& sw->anim);				// прогресс по времени (каждый кадр)
+
+	const int32_t p = sw->anim.value;			// 0..100: позиция ползунка и степень заливки
+	const uint16_t x = win->x1 + sw->x + sw->pill_x;
+	const uint16_t y = win->y1 + sw->y + sw->pill_y;
+	const uint16_t r = sw->sw_h / 2;			// радиус скругления "таблетки"
+
+	/* плавная смена цвета заливки и рамки */
+	const gui_color_t fill = gui_color_lerp(sw->color_off, sw->color_on, (uint8_t) p);
+	const gui_color_t border = gui_color_lerp(GUI_COLOR_SWITCH_OFF_BORDER, GUI_COLOR_SWITCH_ON_BORDER, (uint8_t) p);
+
+	/* подпись */
+	if (sw->cap_w && sw->font)
+		gui_sdl2_draw_text(sw->text, win->x1 + sw->x + sw->cap_x, win->y1 + sw->y + sw->cap_y, sw->font, GUI_COLOR_WHITE);
+
+	/* фон-таблетка */
+	__gui_draw_rounded_rect(x, y, sw->sw_w - 1, sw->sw_h - 1, r, fill, 1);
+	__gui_draw_rounded_rect(x, y, sw->sw_w - 1, sw->sw_h - 1, r, border, 0);
+
+	/* круг-ползунок: позиция интерполируется между выкл и вкл */
+	const uint16_t kd = sw->sw_h - 2 * switch_knob_indent;		// диаметр круга
+	const uint16_t kx_off = x + switch_knob_indent;
+	const uint16_t kx_on = x + sw->sw_w - kd - switch_knob_indent - 1;
+	const uint16_t kx = kx_off + (uint16_t) ((kx_on - kx_off) * p / 100);
+	const uint16_t ky = y + switch_knob_indent;
+
+	__gui_draw_rounded_rect(kx, ky, kd - 1, kd - 1, kd / 2, sw->state == PRESSED ? GUI_COLOR_GRAY : sw->knob_color, 1);
+	__gui_draw_rounded_rect(kx, ky, kd - 1, kd - 1, kd / 2, GUI_COLOR_GRAY, 0);
+
+	/* подсветка нажатия */
+	if (sw->state == PRESSED)
+		__gui_draw_rounded_rect(x + 1, y + 1, sw->sw_w - 3, sw->sw_h - 3, r - 1, GUI_COLOR_BLACK, 0);
 }
 
 // *************** Buttons ****************
@@ -319,6 +418,8 @@ static obj_type_t parse_obj_name(const char * name)
 		return TYPE_LABEL;
 	else if (! strncmp(name, "sl_", 3))
 		return TYPE_SLIDER;
+	else if (! strncmp(name, "sw_", 3))
+		return TYPE_SWITCH;
 	else if (! strncmp(name, "btc_", 4))
 		return TYPE_CLOSE_BUTTON;
 	else if (! strncmp(name, "ta_", 3))
@@ -327,6 +428,7 @@ static obj_type_t parse_obj_name(const char * name)
 		return TYPE_TEXT_FIELD;
 	else if (! strncmp(name, "ca_", 3))
 		return TYPE_CANVAS;
+
 	else
 	{
 		GUI_DEBUG_PRINT("Unrecognized GUI object type: %s\n", name);
@@ -339,6 +441,23 @@ static void obj_name_user(char * name)
 {
 	char * r = strrchr(name, '#');
 	if (r) name[r - name] = '\0';
+}
+
+/* Сохранение габаритов прямоугольной области массового выравнивания:
+   count объектов в сетке cols x rows с шагом interval, начиная с (x, y) */
+static void save_arrange_area(window_t * win, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
+	uint8_t count, uint8_t cols, uint8_t interval)
+{
+	if (! count || ! cols) return;
+
+	const uint8_t rows = (count + cols - 1) / cols;
+	const uint8_t cols_used = count < cols ? count : cols;
+
+	win->arrange_area.x = x;
+	win->arrange_area.y = y;
+	win->arrange_area.w = cols_used * w + (cols_used - 1) * interval;
+	win->arrange_area.h = rows * h + (rows - 1) * interval;
+	win->arrange_area_valid = 1;
 }
 
 // Вариабельные аргументы зависят от типа создаваемого объекта, который
@@ -375,6 +494,10 @@ static void obj_name_user(char * name)
 //                                         ORIENTATION_VERTICAL / ORIENTATION_HORIZONTAL)
 //                           size        - длина шкалы в пикселях
 //                           step        - шаг изменения значения (если 0, принудительно ставится 1)
+//
+// TYPE_SWITCH (sw_):        int w, int h, int on
+//                           w, h - размеры переключателя в пикселях
+//                           on   - начальное состояние (0 - выключен, 1 - включен)
 uint8_t gui_obj_create(const char * name, ...)
 {
 	uint8_t idx, window_id = get_parent_window();
@@ -388,13 +511,40 @@ uint8_t gui_obj_create(const char * name, ...)
 
 	switch (type)
 	{
+	case TYPE_SWITCH:
+	{
+		switch_t * sw_tmp = (switch_t *) realloc(win->sw_ptr, sizeof(switch_t) * (win->sw_count + 1));
+		GUI_MEM_ASSERT(sw_tmp);
+		win->sw_ptr = sw_tmp;
+
+		switch_t * sw = & win->sw_ptr[win->sw_count];
+		memcpy(sw, & switch_default, sizeof(switch_t));
+
+		sw->parent = window_id;
+		sw->sw_w = va_arg(arg, int);
+		sw->sw_h = va_arg(arg, int);
+		sw->payload = va_arg(arg, int) ? 1 : 0;
+		strncpy(sw->name, obj_name, NAME_ARRAY_SIZE);
+		sw->visible = 1;
+		sw->index = win->sw_count;
+		sw->x = 0;
+		sw->y = 0;
+		sw->font = gui_sdl2_get_label_font();
+		gui_anim_set(& sw->anim, sw->payload ? 100 : 0);
+
+		idx = win->sw_count;
+		win->sw_count ++;
+		break;
+	}
 	case TYPE_CANVAS:
 	{
 		canvas_t * ca_tmp = (canvas_t *) realloc(win->ca_ptr, sizeof(canvas_t) * (win->ca_count + 1));
 		GUI_MEM_ASSERT(ca_tmp);
 		win->ca_ptr = ca_tmp;
+
 		canvas_t * ca = & win->ca_ptr[win->ca_count];
 		memset(ca, 0, sizeof(canvas_t));
+
 		ca->parent = window_id;
 		ca->w = va_arg(arg, int);
 		ca->h = va_arg(arg, int);
@@ -406,6 +556,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		ca->x = 0;
 		ca->y = 0;
 		strncpy(ca->name, obj_name, NAME_ARRAY_SIZE);
+
 		idx = win->ca_count;
 		win->ca_count ++;
 		break;
@@ -577,120 +728,6 @@ uint8_t gui_obj_create(const char * name, ...)
 	return idx;
 }
 
-void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t align, uint16_t offset)
-{
-	window_t * win = get_win(get_parent_window());
-	obj_type_t type1 = parse_obj_name(name1);
-	obj_type_t type2 = parse_obj_name(name2);
-	void * oh1 = find_gui_obj(type1, win, name1);
-	void * oh2 = find_gui_obj(type2, win, name2);
-	if (oh1 == oh2)
-		return;
-	uint16_t x2 = 0, y2 = 0, w2 = 0, h2 = 0, baseline2 = 0;
-	switch(type2)
-	{
-	case TYPE_LABEL:
-	{
-		label_t * lh2 = (label_t *) oh2;
-		x2 = lh2->x;
-		y2 = lh2->y;
-		w2 = get_label_width(lh2);
-		h2 = get_label_height(lh2);
-		baseline2 = lh2->baseline;
-		break;
-	}
-	case TYPE_BUTTON:
-	{
-		button_t * bh2 = (button_t *) oh2;
-		x2 = bh2->x1;
-		y2 = bh2->y1;
-		w2 = bh2->w;
-		h2 = bh2->h;
-		break;
-	}
-	case TYPE_TEXT_FIELD:
-	{
-		text_field_t * tf2 = (text_field_t *) oh2;
-		x2 = tf2->x1;
-		y2 = tf2->y1;
-		w2 = tf2->w;
-		h2 = tf2->h;
-		break;
-	}
-	case TYPE_SLIDER:
-	{
-		slider_t * sh2 = (slider_t *) oh2;
-		x2 = sh2->x;
-		y2 = sh2->y;
-		w2 = sh2->width;
-		h2 = sh2->height;
-		break;
-	}
-	case TYPE_CANVAS:
-	{
-		canvas_t * ca2 = (canvas_t *) oh2;
-		x2 = ca2->x;
-		y2 = ca2->y;
-		w2 = ca2->w;
-		h2 = ca2->h;
-		break;
-	}
-	default:
-		break;
-	}
-	switch(type1)
-	{
-	case TYPE_LABEL:
-	{
-		label_t * lh1 = (label_t *) oh1;
-		if (align == ALIGN_RIGHT_UP) { lh1->x = x2 + w2 + offset; lh1->y = y2; }
-		else if (align == ALIGN_RIGHT_UP_MID) { lh1->x = x2 + w2 + offset; lh1->y = y2 + (h2 / 2 - get_label_height(lh1) / 2); }
-		else if (align == ALIGN_LEFT_UP)  { lh1->x = x2 - get_label_width(lh1) - offset; lh1->y = y2; }
-		else if (align == ALIGN_DOWN_LEFT) { lh1->x = x2; lh1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_MID) { lh1->x = x2 + w2 / 2 - get_label_width(lh1) / 2; lh1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_RIGHT) { lh1->x = x2 + w2 - get_label_width(lh1); lh1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_LEFT_TOP) { lh1->x = x2; lh1->y = y2 - get_label_height(lh1) - offset; }
-		else if (align == ALIGN_RIGHT_DOWN) { lh1->x = x2 + w2 + offset; lh1->y = y2 + baseline2 - lh1->baseline; }
-		break;
-	}
-	case TYPE_BUTTON:
-	{
-		button_t * bh1 = (button_t *) oh1;
-		if (align == ALIGN_RIGHT_UP) { bh1->x1 = x2 + w2 + offset; bh1->y1 = y2; }
-		else if (align == ALIGN_RIGHT_UP_MID) { bh1->x1 = x2 + w2 + offset; bh1->y1 = y2 + (h2 / 2 - bh1->h / 2); }
-		else if (align == ALIGN_LEFT_UP)  { bh1->x1 = x2 - bh1->w - offset; bh1->y1 = y2; }
-		else if (align == ALIGN_DOWN_LEFT) { bh1->x1 = x2; bh1->y1 = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_MID) { bh1->x1 = x2 + w2 / 2 - bh1->w / 2; bh1->y1 = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_RIGHT) { bh1->x1 = x2 + w2 - bh1->w; bh1->y1 = y2 + h2 + offset; }
-		break;
-	}
-	case TYPE_SLIDER:
-	{
-		slider_t * sh1 = (slider_t *) oh1;
-		if (align == ALIGN_RIGHT_UP) { sh1->x = x2 + w2 + offset; sh1->y = y2; }
-		else if (align == ALIGN_RIGHT_UP_MID) { sh1->x = x2 + w2 + offset; sh1->y = y2 + (h2 / 2 - sh1->height / 2); }
-		else if (align == ALIGN_LEFT_UP)  { sh1->x = x2 - sh1->width - offset; sh1->y = y2; }
-		else if (align == ALIGN_DOWN_LEFT) { sh1->x = x2; sh1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_MID) { sh1->x = x2 + w2 / 2 - sh1->width / 2; sh1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_RIGHT) { sh1->x = x2 + w2 - sh1->width; sh1->y = y2 + h2 + offset; }
-		break;
-	}
-	case TYPE_CANVAS:
-	{
-		canvas_t * ca1 = (canvas_t *) oh1;
-		if (align == ALIGN_RIGHT_UP) { ca1->x = x2 + w2 + offset; ca1->y = y2; }
-		else if (align == ALIGN_RIGHT_UP_MID) { ca1->x = x2 + w2 + offset; ca1->y = y2 + (h2 / 2 - ca1->h / 2); }
-		else if (align == ALIGN_LEFT_UP) { ca1->x = x2 - ca1->w - offset; ca1->y = y2; }
-		else if (align == ALIGN_DOWN_LEFT) { ca1->x = x2; ca1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_MID) { ca1->x = x2 + w2 / 2 - ca1->w / 2; ca1->y = y2 + h2 + offset; }
-		else if (align == ALIGN_DOWN_RIGHT) { ca1->x = x2 + w2 - ca1->w; ca1->y = y2 + h2 + offset; }
-		break;
-	}
-	default:
-		break;
-	}
-}
-
 char * gui_obj_get_string_prop(const char * name, object_prop_t prop)
 {
 	window_t * win = get_win(get_parent_window());
@@ -703,10 +740,17 @@ char * gui_obj_get_string_prop(const char * name, object_prop_t prop)
 		label_t * lh = (label_t *) obj;
 		if (prop == GUI_OBJ_TEXT) return lh->text;
 		break;
+
 	case TYPE_BUTTON:
 		button_t * bh = (button_t *) obj;
 		if (prop == GUI_OBJ_TEXT) return bh->text;
 		break;
+
+	case TYPE_SWITCH:
+		switch_t * sw = (switch_t *) obj;
+		if (prop == GUI_OBJ_TEXT) return sw->text;
+		break;
+
 	default:
 		break;
 	}
@@ -721,6 +765,22 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 	void * obj = find_gui_obj(type, win, name);
 	switch(type)
 	{
+	case TYPE_SWITCH:
+	{
+		switch_t * sw = (switch_t *) obj;
+		if (prop == GUI_OBJ_VISIBLE) return sw->visible;
+		else if (prop == GUI_OBJ_POS_X) return sw->x;
+		else if (prop == GUI_OBJ_POS_Y) return sw->y;
+		else if (prop == GUI_OBJ_PAYLOAD) return sw->payload;
+		else if (prop == GUI_OBJ_STATE) return sw->state;
+		else if (prop == GUI_OBJ_COLOR) return (int) sw->color_on;
+		else if (prop == GUI_OBJ_WIDTH) return sw->w;
+		else if (prop == GUI_OBJ_HEIGHT) return sw->h;
+		else if (prop == GUI_OBJ_INDEX) return sw->index;
+		else if (prop == GUI_OBJ_ALIGN) return sw->caption_align;
+		break;
+	}
+
 	case TYPE_LABEL:
 	{
 		label_t * lh = (label_t *) obj;
@@ -736,6 +796,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_INDEX) return lh->index;
 		break;
 	}
+
 	case TYPE_BUTTON:
 	{
 		button_t * bh = (button_t *) obj;
@@ -752,6 +813,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_INDEX) return bh->index;
 		break;
 	}
+
 	case TYPE_SLIDER:
 	{
 		slider_t * sh = (slider_t *) obj;
@@ -766,6 +828,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_INDEX) return sh->index;
 		break;
 	}
+
 	case TYPE_TOUCH_AREA:
 	{
 		touch_area_t * ta = (touch_area_t *) obj;
@@ -779,6 +842,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_INDEX) return ta->index;
 		break;
 	}
+
 	case TYPE_TEXT_FIELD:
 	{
 		text_field_t * tf = (text_field_t *) obj;
@@ -791,6 +855,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_INDEX) return tf->index;
 		break;
 	}
+
 	case TYPE_CANVAS:
 	{
 		canvas_t * ca = (canvas_t *) obj;
@@ -805,6 +870,7 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 		else if (prop == GUI_OBJ_INDEX) return ca->index;
 		break;
 	}
+
 	default:
 		break;
 	}
@@ -879,6 +945,21 @@ int gui_obj_get_int_prop(const char * name, object_prop_t prop)
 // GUI_OBJ_TEXT:             char * text, int color_line
 // GUI_OBJ_TEXT_FMT:         char * format, ..., int color_line
 // GUI_OBJ_CLEAN:            (нет вариабельных аргументов; очищает поле и сбрасывает индекс)
+//
+// ===================== TYPE_SWITCH (sw_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x                       (левый верх полного габарита)
+// GUI_OBJ_POS_Y:            int y
+// GUI_OBJ_POS:              int x, int y
+// GUI_OBJ_PAYLOAD:          int on                      (0/1 - состояние переключателя)
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_COLOR:            gui_color_t color_on        (заливка во включенном состоянии)
+// GUI_OBJ_TEXT:             char * text                 (подпись; полный габарит пересчитывается)
+// GUI_OBJ_TEXT_FMT:         char * format, ...          (подпись с форматированием)
+// GUI_OBJ_ALIGN:            int caption_align           (значения switch_caption_t; пересчёт)
+// GUI_OBJ_WIDTH:            int w                       (ширина ТЕЛА; полный габарит пересчитывается)
+// GUI_OBJ_HEIGHT:           int h                       (высота ТЕЛА; полный габарит пересчитывается)
+// GUI_OBJ_SIZE:             int w, int h                (размеры ТЕЛА; полный габарит пересчитывается)
 void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 {
 	window_t * win = get_win(get_parent_window());
@@ -889,6 +970,35 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 	va_start(arg, prop);
 	switch(type)
 	{
+	case TYPE_SWITCH:
+	{
+		switch_t * sw = (switch_t *) obj;
+		if (prop == GUI_OBJ_VISIBLE) sw->visible = !! va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_X) sw->x = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS_Y) sw->y = va_arg(arg, int);
+		else if (prop == GUI_OBJ_POS) { sw->x = va_arg(arg, int); sw->y = va_arg(arg, int); }
+		else if (prop == GUI_OBJ_PAYLOAD) sw->payload = va_arg(arg, int) ? 1 : 0;
+		else if (prop == GUI_OBJ_STATE) sw->state = va_arg(arg, int);
+		else if (prop == GUI_OBJ_COLOR) sw->color_on = va_arg(arg, gui_color_t);
+		else if (prop == GUI_OBJ_TEXT) {
+			strncpy(sw->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
+			sw->text[TEXT_ARRAY_SIZE - 1] = '\0';
+			switch_update_layout(sw);
+		}
+		else if (prop == GUI_OBJ_TEXT_FMT) {
+			vsnprintf(sw->text, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
+			sw->text[TEXT_ARRAY_SIZE - 1] = '\0';
+			switch_update_layout(sw);
+		}
+		else if (prop == GUI_OBJ_ALIGN) {
+			sw->caption_align = (switch_caption_t) va_arg(arg, int);
+			switch_update_layout(sw);
+		}
+		else if (prop == GUI_OBJ_WIDTH) { sw->sw_w = va_arg(arg, int); switch_update_layout(sw); }
+		else if (prop == GUI_OBJ_HEIGHT) { sw->sw_h = va_arg(arg, int); switch_update_layout(sw); }
+		else if (prop == GUI_OBJ_SIZE) { sw->sw_w = va_arg(arg, int); sw->sw_h = va_arg(arg, int); switch_update_layout(sw); }
+		break;
+	}
 	case TYPE_LABEL:
 	{
 		label_t * lh = (label_t *) obj;
@@ -1070,25 +1180,172 @@ static uint8_t get_obj_idx_by_name(window_t * win, obj_type_t type, const char *
 		return ((slider_t *) p)->index;
 	else if (type == TYPE_CANVAS)
 		return ((canvas_t *) p)->index;
+	else if (type == TYPE_SWITCH)
+		return ((switch_t *) p)->index;
 	GUI_ASSERT(0);
 	return 0;
+}
+
+/* Применение выравнивания к объекту относительно прямоугольника (x2, y2, w2, h2) */
+static void obj_apply_align(obj_type_t type, void * oh, object_alignment_t align, uint16_t offset,
+	uint16_t x2, uint16_t y2, uint16_t w2, uint16_t h2, uint16_t baseline2)
+{
+	switch (type)
+	{
+	case TYPE_LABEL:
+	{
+		label_t * lh = (label_t *) oh;
+		if (align == ALIGN_RIGHT_UP) { lh->x = x2 + w2 + offset; lh->y = y2; }
+		else if (align == ALIGN_RIGHT_UP_MID) { lh->x = x2 + w2 + offset; lh->y = y2 + (h2 / 2 - get_label_height(lh) / 2); }
+		else if (align == ALIGN_LEFT_UP)  { lh->x = x2 - get_label_width(lh) - offset; lh->y = y2; }
+		else if (align == ALIGN_DOWN_LEFT) { lh->x = x2; lh->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_MID) { lh->x = x2 + w2 / 2 - get_label_width(lh) / 2; lh->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_RIGHT) { lh->x = x2 + w2 - get_label_width(lh); lh->y = y2 + h2 + offset; }
+		else if (align == ALIGN_LEFT_TOP) { lh->x = x2; lh->y = y2 - get_label_height(lh) - offset; }
+		else if (align == ALIGN_RIGHT_DOWN) { lh->x = x2 + w2 + offset; lh->y = y2 + baseline2 - lh->baseline; }
+		break;
+	}
+	case TYPE_BUTTON:
+	{
+		button_t * bh = (button_t *) oh;
+		if (align == ALIGN_RIGHT_UP) { bh->x1 = x2 + w2 + offset; bh->y1 = y2; }
+		else if (align == ALIGN_RIGHT_UP_MID) { bh->x1 = x2 + w2 + offset; bh->y1 = y2 + (h2 / 2 - bh->h / 2); }
+		else if (align == ALIGN_LEFT_UP)  { bh->x1 = x2 - bh->w - offset; bh->y1 = y2; }
+		else if (align == ALIGN_DOWN_LEFT) { bh->x1 = x2; bh->y1 = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_MID) { bh->x1 = x2 + w2 / 2 - bh->w / 2; bh->y1 = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_RIGHT) { bh->x1 = x2 + w2 - bh->w; bh->y1 = y2 + h2 + offset; }
+		break;
+	}
+	case TYPE_SLIDER:
+	{
+		slider_t * sh = (slider_t *) oh;
+		if (align == ALIGN_RIGHT_UP) { sh->x = x2 + w2 + offset; sh->y = y2; }
+		else if (align == ALIGN_RIGHT_UP_MID) { sh->x = x2 + w2 + offset; sh->y = y2 + (h2 / 2 - sh->height / 2); }
+		else if (align == ALIGN_LEFT_UP)  { sh->x = x2 - sh->width - offset; sh->y = y2; }
+		else if (align == ALIGN_DOWN_LEFT) { sh->x = x2; sh->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_MID) { sh->x = x2 + w2 / 2 - sh->width / 2; sh->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_RIGHT) { sh->x = x2 + w2 - sh->width; sh->y = y2 + h2 + offset; }
+		break;
+	}
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca = (canvas_t *) oh;
+		if (align == ALIGN_RIGHT_UP) { ca->x = x2 + w2 + offset; ca->y = y2; }
+		else if (align == ALIGN_RIGHT_UP_MID) { ca->x = x2 + w2 + offset; ca->y = y2 + (h2 / 2 - ca->h / 2); }
+		else if (align == ALIGN_LEFT_UP) { ca->x = x2 - ca->w - offset; ca->y = y2; }
+		else if (align == ALIGN_DOWN_LEFT) { ca->x = x2; ca->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_MID) { ca->x = x2 + w2 / 2 - ca->w / 2; ca->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_RIGHT) { ca->x = x2 + w2 - ca->w; ca->y = y2 + h2 + offset; }
+		break;
+	}
+	case TYPE_SWITCH:
+	{
+		switch_t * sw = (switch_t *) oh;
+		if (align == ALIGN_RIGHT_UP) { sw->x = x2 + w2 + offset; sw->y = y2; }
+		else if (align == ALIGN_RIGHT_UP_MID) { sw->x = x2 + w2 + offset; sw->y = y2 + (h2 / 2 - sw->h / 2); }
+		else if (align == ALIGN_LEFT_UP)  { sw->x = x2 - sw->w - offset; sw->y = y2; }
+		else if (align == ALIGN_DOWN_LEFT) { sw->x = x2; sw->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_MID) { sw->x = x2 + w2 / 2 - sw->w / 2; sw->y = y2 + h2 + offset; }
+		else if (align == ALIGN_DOWN_RIGHT) { sw->x = x2 + w2 - sw->w; sw->y = y2 + h2 + offset; }
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t align, uint16_t offset)
+{
+	window_t * win = get_win(get_parent_window());
+	obj_type_t type1 = parse_obj_name(name1);
+	obj_type_t type2 = parse_obj_name(name2);
+	void * oh1 = find_gui_obj(type1, win, name1);
+	void * oh2 = find_gui_obj(type2, win, name2);
+	uint16_t x2 = 0, y2 = 0, w2 = 0, h2 = 0, baseline2 = 0;
+
+	if (oh1 == oh2) return;
+
+	switch(type2)
+	{
+	case TYPE_SWITCH:
+	{
+		switch_t * sw2 = (switch_t *) oh2;
+		x2 = sw2->x; y2 = sw2->y; w2 = sw2->w; h2 = sw2->h;
+		break;
+	}
+	case TYPE_LABEL:
+	{
+		label_t * lh2 = (label_t *) oh2;
+		x2 = lh2->x;
+		y2 = lh2->y;
+		w2 = get_label_width(lh2);
+		h2 = get_label_height(lh2);
+		baseline2 = lh2->baseline;
+		break;
+	}
+	case TYPE_BUTTON:
+	{
+		button_t * bh2 = (button_t *) oh2;
+		x2 = bh2->x1;
+		y2 = bh2->y1;
+		w2 = bh2->w;
+		h2 = bh2->h;
+		break;
+	}
+	case TYPE_TEXT_FIELD:
+	{
+		text_field_t * tf2 = (text_field_t *) oh2;
+		x2 = tf2->x1;
+		y2 = tf2->y1;
+		w2 = tf2->w;
+		h2 = tf2->h;
+		break;
+	}
+	case TYPE_SLIDER:
+	{
+		slider_t * sh2 = (slider_t *) oh2;
+		x2 = sh2->x;
+		y2 = sh2->y;
+		w2 = sh2->width;
+		h2 = sh2->height;
+		break;
+	}
+	case TYPE_CANVAS:
+	{
+		canvas_t * ca2 = (canvas_t *) oh2;
+		x2 = ca2->x;
+		y2 = ca2->y;
+		w2 = ca2->w;
+		h2 = ca2->h;
+		break;
+	}
+	default:
+		break;
+	}
+
+	obj_apply_align(type1, oh1, align, offset, x2, y2, w2, h2, baseline2);
 }
 
 void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, uint8_t interval)
 {
 	if (count <= 1) return;
+
 	window_t * win = get_win(get_parent_window());
 	obj_type_t type = parse_obj_name(name);
-	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER && type != TYPE_CANVAS)
+
+	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER &&
+	    type != TYPE_CANVAS && type != TYPE_SWITCH)
 	{
 		GUI_DEBUG_PRINT("%s: idx %d unsupported object type to arrange\n", __func__, 0);
 		GUI_ASSERT(0);
 	}
+
 	uint16_t x = gui_obj_get_int_prop(name, GUI_OBJ_POS_X);
 	uint16_t y = gui_obj_get_int_prop(name, GUI_OBJ_POS_Y);
 	uint16_t w = gui_obj_get_int_prop(name, GUI_OBJ_WIDTH);
 	uint16_t h = gui_obj_get_int_prop(name, GUI_OBJ_HEIGHT);
 	uint8_t idx = get_obj_idx_by_name(win, type, name) + 1;
+
 	for (int i = 1; i < count; i ++)
 	{
 		uint8_t row = i / cols;
@@ -1097,6 +1354,25 @@ void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, ui
 		gui_obj_set_prop(obj, GUI_OBJ_POS_X, x + (w + interval) * col);
 		gui_obj_set_prop(obj, GUI_OBJ_POS_Y, y + (h + interval) * row);
 	}
+
+	save_arrange_area(win, x, y, w, h, count, cols, interval);
+}
+
+/* Выравнивание объекта относительно прямоугольной области последнего массового
+   выравнивания (gui_arrange_objects / gui_arrange_objects_from) текущего окна.
+   baseline2 для области принимается равным 0 (верхняя граница). */
+void gui_obj_align_to_arrange_area(const char * name, object_alignment_t align, uint16_t offset)
+{
+	window_t * win = get_win(get_parent_window());
+	if (! win->arrange_area_valid)
+	{
+		GUI_DEBUG_PRINT("%s: no arrange area saved in window '%s'\n", __func__, win->title);
+		GUI_ASSERT(0);
+	}
+	obj_type_t type = parse_obj_name(name);
+	void * oh = find_gui_obj(type, win, name);
+	obj_apply_align(type, oh, align, offset,
+		win->arrange_area.x, win->arrange_area.y, win->arrange_area.w, win->arrange_area.h, 0);
 }
 
 char * get_obj_name_by_idx(obj_type_t type, uint8_t idx)
@@ -1131,6 +1407,13 @@ char * get_obj_name_by_idx(obj_type_t type, uint8_t idx)
 		obj_name_user(obj_name);
 		return obj_name;
 	}
+	else if (type == TYPE_SWITCH)
+	{
+		GUI_ASSERT(idx < win->sw_count);
+		strncpy(obj_name, win->sw_ptr[idx].name, NAME_ARRAY_SIZE);
+		obj_name_user(obj_name);
+		return obj_name;
+	}
 	GUI_ASSERT(0);
 	return NULL;
 }
@@ -1140,17 +1423,22 @@ char * get_obj_name_by_idx(obj_type_t type, uint8_t idx)
 void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uint8_t cols, uint8_t interval)
 {
 	if (count <= 1) return;
+
 	window_t * win = get_win(get_parent_window());
 	obj_type_t type = parse_obj_name(names[0]);
-	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER && type != TYPE_CANVAS)
+
+	if (type != TYPE_BUTTON && type != TYPE_LABEL && type != TYPE_SLIDER &&
+	    type != TYPE_CANVAS && type != TYPE_SWITCH)
 	{
 		GUI_DEBUG_PRINT("%s: idx %d unsupported object type to arrange\n", __func__, 0);
 		GUI_ASSERT(0);
 	}
+
 	uint16_t x = gui_obj_get_int_prop(names[0], GUI_OBJ_POS_X);
 	uint16_t y = gui_obj_get_int_prop(names[0], GUI_OBJ_POS_Y);
 	uint16_t w = gui_obj_get_int_prop(names[0], GUI_OBJ_WIDTH);
 	uint16_t h = gui_obj_get_int_prop(names[0], GUI_OBJ_HEIGHT);
+
 	for (int i = 1; i < count; i ++)
 	{
 		uint8_t row = i / cols;
@@ -1165,6 +1453,8 @@ void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uin
 		gui_obj_set_prop(obj, GUI_OBJ_POS_X, x + (w + interval) * col);
 		gui_obj_set_prop(obj, GUI_OBJ_POS_Y, y + (h + interval) * row);
 	}
+
+	save_arrange_area(win, x, y, w, h, count, cols, interval);
 }
 
 void gui_objects_init(void)

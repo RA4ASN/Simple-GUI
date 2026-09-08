@@ -83,6 +83,7 @@ static void free_win_ptr (window_t * win)
 	win->ta_count = 0;
 	win->tf_count = 0;
 	win->ca_count = 0;
+	win->sw_count = 0;
 
 	win->bh_ptr = NULL;
 	win->lh_ptr = NULL;
@@ -90,6 +91,7 @@ static void free_win_ptr (window_t * win)
 	win->ta_ptr = NULL;
 	win->tf_ptr = NULL;
 	win->ca_ptr = NULL;
+	win->sw_ptr = NULL;
 //	GUI_DEBUG_PRINT("free: %d %s\n", win->window_id, win->title);
 }
 
@@ -258,6 +260,17 @@ void calculate_window_position(uint8_t mode, ...)
 				GUI_ASSERT(ymax < gui_sizes.max_h);
 			}
 		}
+		if (win->sw_ptr != NULL)
+		{
+			for (uint8_t i = 0; i < win->sw_count; i++)
+			{
+				const switch_t * sw = & win->sw_ptr[i];
+				xmax = (xmax > sw->x + sw->w) ? xmax : (sw->x + sw->w);
+				ymax = (ymax > sw->y + sw->h) ? ymax : (sw->y + sw->h);
+				GUI_ASSERT(xmax < gui_sizes.max_w);
+				GUI_ASSERT(ymax < gui_sizes.max_h);
+			}
+		}
 		/* canvas: координаты относительно draw_x1/draw_y1,
 		   для xmax/ymax переводим в систему x1/y1 добавлением shift */
 		if (win->ca_ptr != NULL)
@@ -337,6 +350,22 @@ void calculate_window_position(uint8_t mode, ...)
 				GUI_ASSERT(sh->x < gui_sizes.max_w);
 				GUI_ASSERT(sh->y < gui_sizes.max_h);
 			}
+		}
+		if (win->sw_ptr != NULL)
+		{
+			for (uint8_t i = 0; i < win->sw_count; i++)
+			{
+				switch_t * sw = & win->sw_ptr[i];
+				sw->x += shift_x;
+				sw->y += shift_y;
+				GUI_ASSERT(sw->x + sw->w < gui_sizes.max_w);
+				GUI_ASSERT(sw->y + sw->h < gui_sizes.max_h);
+			}
+		}
+		if (win->arrange_area_valid)
+		{
+			win->arrange_area.x += shift_x;
+			win->arrange_area.y += shift_y;
 		}
 		/* canvas: сдвиг НЕ добавляем */
 	}

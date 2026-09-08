@@ -26,6 +26,8 @@ void draw_close_button(button_t * bh);
 
 void draw_slider(slider_t * sl);
 
+void draw_switch(switch_t * sw);
+
 void draw_canvas(canvas_t * ca);
 void gui_canvas_set_active(const char * name);
 void gui_canvas_print(const char * text, int x, int y, TTF_Font * font, gui_color_t color);
@@ -40,5 +42,6 @@ uint8_t gui_check_obj(const char * name1, const char * name2);
 void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uint8_t cols, uint8_t interval);
 void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, uint8_t interval);
 char * get_obj_name_by_idx(obj_type_t type, uint8_t idx);
+void gui_obj_align_to_arrange_area(const char * name, object_alignment_t align, uint16_t offset);
 
 #endif /* _gui_objects_h */

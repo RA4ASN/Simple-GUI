@@ -46,8 +46,12 @@ enum {
 	labels_font_size_default = 18,
 	win_title_font_size_default = 16,
 
-	button_round_radius = 3,	// радиус закругления кнопки
-	autorepeat_delay = 4,		// задержка автоповтора действий
+	switch_knob_indent = 6,			// отступ круга от краёв "таблетки" переключателя
+	switch_caption_indent = 12,		// зазор между подписью и телом переключателя
+	switch_anim_duration_ms = 200,	// длительность анимации смены состояния переключателя
+
+	button_round_radius = 3,		// радиус закругления кнопки
+	autorepeat_delay = 4,			// задержка автоповтора действий
 	footer_buttons_count = 9,
 	common_btn_interval = 3,
 	NAME_ARRAY_SIZE = 40,

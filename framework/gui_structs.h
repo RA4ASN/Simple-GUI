@@ -6,6 +6,7 @@
 #include "gui_system.h"
 #include "gui_settings.h"
 #include "gui_sdl2_api.h"
+#include "gui_animation.h"
 #include <SDL2/SDL_ttf.h>
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
@@ -15,6 +16,7 @@
 #define IS_LABEL_MOVE			(type == TYPE_LABEL && action == MOVING)
 #define IS_AREA_TOUCHED 		(type == TYPE_TOUCH_AREA && action == PRESSED)
 #define IS_AREA_MOVE	 		(type == TYPE_TOUCH_AREA && action == MOVING)
+#define IS_SWITCH_TOGGLE		(type == TYPE_SWITCH && action == PRESSED)
 
 #define GET_FROM_WM_QUEUE(W)	uint8_t type;	\
 								int32_t action;	\
@@ -29,7 +31,8 @@ typedef enum {
 	TYPE_CLOSE_BUTTON,
 	TYPE_TOUCH_AREA,
 	TYPE_TEXT_FIELD,
-	TYPE_CANVAS
+	TYPE_CANVAS,
+	TYPE_SWITCH
 } obj_type_t;
 
 enum {
@@ -98,6 +101,13 @@ typedef enum {
 } object_alignment_t;
 
 typedef enum {
+	SWITCH_CAPTION_LEFT,			// подпись слева от переключателя
+	SWITCH_CAPTION_RIGHT,			// подпись справа от переключателя
+	SWITCH_CAPTION_TOP,				// подпись сверху (тело центрируется по строке текста)
+	SWITCH_CAPTION_BOTTOM,			// подпись снизу (тело центрируется по строке текста)
+} switch_caption_t;
+
+typedef enum {
 	GUI_OBJ_VISIBLE,
 	GUI_OBJ_POS_X,
 	GUI_OBJ_POS_Y,
@@ -130,6 +140,13 @@ enum {
 	//
 	BG_COUNT
 };
+
+typedef struct {
+	uint16_t x;					// левый верхний угол области
+	uint16_t y;
+	uint16_t w;					// габариты области
+	uint16_t h;
+} gui_rect_t;
 
 typedef struct {
 	uint16_t w;
@@ -171,6 +188,34 @@ typedef struct {
 	uint16_t w;
 	uint16_t h;
 } touch_area_t;
+
+typedef struct {
+	uint8_t parent;
+	uint8_t state;
+	uint8_t visible;
+	uint8_t index;
+	char name[NAME_ARRAY_SIZE];
+	char text[TEXT_ARRAY_SIZE];		// текст подписи
+	int32_t payload;				// 0 - выключен, 1 - включен
+	gui_color_t color_on;			// цвет заливки во включенном состоянии
+	gui_color_t color_off;			// цвет заливки в выключенном состоянии
+	gui_color_t knob_color;			// цвет подвижного круга (ползунка)
+	switch_caption_t caption_align;	// позиция подписи относительно тела
+	uint16_t x;						// левый верх полного габарита (подпись + тело)
+	uint16_t y;
+	uint16_t w;						// полный габарит объекта (с учётом подписи)
+	uint16_t h;
+	uint16_t sw_w;					// размер тела переключателя ("таблетки")
+	uint16_t sw_h;
+	uint16_t cap_w;					// габариты подписи (метрики текста)
+	uint16_t cap_h;
+	uint16_t cap_x;					// смещение подписи внутри полного габарита
+	uint16_t cap_y;
+	uint16_t pill_x;				// смещение тела внутри полного габарита
+	uint16_t pill_y;
+	TTF_Font * font;				// шрифт подписи
+	gui_anim_t anim;				// анимация смены состояния (value: 0..100 - позиция ползунка и заливка)
+} switch_t;
 
 typedef struct {
 	uint16_t w;
@@ -311,6 +356,8 @@ typedef struct {
 	uint8_t ta_count;
 	text_field_t * tf_ptr;
 	uint8_t tf_count;
+	switch_t * sw_ptr;				// массив переключателей окна
+	uint8_t sw_count;
 	canvas_t * ca_ptr;
 	uint8_t ca_count;
 	canvas_t * ca_current;			// выбранный canvas для отрисовки
@@ -331,7 +378,8 @@ typedef struct {
 	uint8_t is_moving;
 	int8_t idx_bh_focus;
 	uint8_t idx_bh_focus_old;
-
+	gui_rect_t arrange_area;		// прямоугольная область последнего массового выравнивания
+	uint8_t arrange_area_valid;		// 1 - arrange_area содержит актуальные данные
 } window_t;
 
 typedef struct {

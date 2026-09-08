@@ -261,6 +261,16 @@ void * find_gui_obj(obj_type_t type, window_t * win, const char * name)
 
 	switch (type)
 	{
+	case TYPE_SWITCH:
+		for (uint8_t i = 0; i < win->sw_count; i++)
+		{
+			switch_t * sw = & win->sw_ptr[i];
+			if (! strcmp(sw->name, obj_name))
+				return (switch_t *) sw;
+		}
+		goto not_found;
+		break;
+
 	case TYPE_BUTTON:
 		for (uint8_t i = 0; i < win->bh_count; i ++)
 		{
@@ -349,68 +359,105 @@ static void element_touch_info(obj_type_t type, void * link,
 	{
 	case TYPE_BUTTON:
 	case TYPE_CLOSE_BUTTON:
-		{
-			button_t * bh = (button_t *) link;
-			*visible = bh->visible; *state = bh->state;
-			*trackable = 0; *longpress = bh->is_long_press; *repeat = bh->is_repeating;
-			*x1 = (bh->x1 - e) < 0 ? 0 : (bh->x1 - e);
-			*x2 = (bh->x1 + bh->w + e) > gui_sizes.max_w ? gui_sizes.max_w : (bh->x1 + bh->w + e);
-			*y1 = (bh->y1 - e) < 0 ? 0 : (bh->y1 - e);
-			*y2 = (bh->y1 + bh->h + e) > gui_sizes.max_h ? gui_sizes.max_h : (bh->y1 + bh->h + e);
-		}
-		break;
+	{
+		button_t * bh = (button_t *) link;
+		* visible = bh->visible;
+		* state = bh->state;
+		* trackable = 0;
+		* longpress = bh->is_long_press;
+		* repeat = bh->is_repeating;
+		* x1 = (bh->x1 - e) < 0 ? 0 : (bh->x1 - e);
+		* x2 = (bh->x1 + bh->w + e) > gui_sizes.max_w ? gui_sizes.max_w : (bh->x1 + bh->w + e);
+		* y1 = (bh->y1 - e) < 0 ? 0 : (bh->y1 - e);
+		* y2 = (bh->y1 + bh->h + e) > gui_sizes.max_h ? gui_sizes.max_h : (bh->y1 + bh->h + e);
+	}
+	break;
+
+	case TYPE_SWITCH:
+	{
+		switch_t * sw = (switch_t *) link;
+		* visible = sw->visible;
+		* state = sw->state;
+		* trackable = 0;
+		* longpress = 0;
+		* repeat = 0;
+		* x1 = (sw->x - e) < 0 ? 0 : (sw->x - e);
+		* x2 = (sw->x + sw->w + e) > gui_sizes.max_w ? gui_sizes.max_w : (sw->x + sw->w + e);
+		* y1 = (sw->y - e) < 0 ? 0 : (sw->y - e);
+		* y2 = (sw->y + sw->h + e) > gui_sizes.max_h ? gui_sizes.max_h : (sw->y + sw->h + e);
+	}
+	break;
 
 	case TYPE_LABEL:
-		{
-			label_t * lh = (label_t *) link;
-			*visible = lh->visible; *state = lh->state;
-			*trackable = lh->is_trackable; *longpress = 0; *repeat = 0;
-			*x1 = (lh->x - e) < 0 ? 0 : (lh->x - e);
-			*x2 = (lh->x + get_label_width(lh) + e) > gui_sizes.max_w ? gui_sizes.max_w : (lh->x + get_label_width(lh) + e);
-			*y1 = (lh->y - get_label_height(lh) - e) < 0 ? 0 : (lh->y - get_label_height(lh) - e);
-			*y2 = (lh->y + get_label_height(lh) * 2 + e) > gui_sizes.max_h ? gui_sizes.max_h : (lh->y + get_label_height(lh) * 2 + e);
-		}
-		break;
+	{
+		label_t * lh = (label_t *) link;
+		* visible = lh->visible;
+		* state = lh->state;
+		* trackable = lh->is_trackable;
+		* longpress = 0;
+		* repeat = 0;
+		* x1 = (lh->x - e) < 0 ? 0 : (lh->x - e);
+		* x2 = (lh->x + get_label_width(lh) + e) > gui_sizes.max_w ? gui_sizes.max_w : (lh->x + get_label_width(lh) + e);
+		* y1 = (lh->y - get_label_height(lh) - e) < 0 ? 0 : (lh->y - get_label_height(lh) - e);
+		* y2 = (lh->y + get_label_height(lh) * 2 + e) > gui_sizes.max_h ? gui_sizes.max_h : (lh->y + get_label_height(lh) * 2 + e);
+	}
+	break;
 
 	case TYPE_SLIDER:
-		{
-			slider_t * sh = (slider_t *) link;
-			*visible = sh->visible; *state = sh->state;
-			*trackable = 1; *longpress = 0; *repeat = 0;
-			*x1 = (sh->x - e) < 0 ? 0 : (sh->x - e);
-			*x2 = (sh->x + sh->width + e) > gui_sizes.max_w ? gui_sizes.max_w : (sh->x + sh->width + e);
-			*y1 = (sh->y - e) < 0 ? 0 : (sh->y - e);
-			*y2 = (sh->y + sh->height + e) > gui_sizes.max_h ? gui_sizes.max_h : (sh->y + sh->height + e);
-		}
-		break;
+	{
+		slider_t * sh = (slider_t *) link;
+		* visible = sh->visible;
+		* state = sh->state;
+		* trackable = 1;
+		* longpress = 0;
+		* repeat = 0;
+		* x1 = (sh->x - e) < 0 ? 0 : (sh->x - e);
+		* x2 = (sh->x + sh->width + e) > gui_sizes.max_w ? gui_sizes.max_w : (sh->x + sh->width + e);
+		* y1 = (sh->y - e) < 0 ? 0 : (sh->y - e);
+		* y2 = (sh->y + sh->height + e) > gui_sizes.max_h ? gui_sizes.max_h : (sh->y + sh->height + e);
+	}
+	break;
 
 	case TYPE_TOUCH_AREA:
-		{
-			touch_area_t * ta = (touch_area_t *) link;
-			*visible = ta->visible; *state = ta->state;
-			*trackable = ta->is_trackable; *longpress = 0; *repeat = 0;
-			*x1 = (ta->x1) < 0 ? 0 : (ta->x1);
-			*x2 = (ta->x1 + ta->w) > gui_sizes.max_w ? gui_sizes.max_w : (ta->x1 + ta->w);
-			*y1 = (ta->y1) < 0 ? 0 : (ta->y1);
-			*y2 = (ta->y1 + ta->h) > gui_sizes.max_h ? gui_sizes.max_h : (ta->y1 + ta->h);
-		}
-		break;
+	{
+		touch_area_t * ta = (touch_area_t *) link;
+		* visible = ta->visible;
+		* state = ta->state;
+		* trackable = ta->is_trackable;
+		* longpress = 0;
+		* repeat = 0;
+		* x1 = (ta->x1) < 0 ? 0 : (ta->x1);
+		* x2 = (ta->x1 + ta->w) > gui_sizes.max_w ? gui_sizes.max_w : (ta->x1 + ta->w);
+		* y1 = (ta->y1) < 0 ? 0 : (ta->y1);
+		* y2 = (ta->y1 + ta->h) > gui_sizes.max_h ? gui_sizes.max_h : (ta->y1 + ta->h);
+	}
+	break;
 
 	case TYPE_TEXT_FIELD:
-		{
-			text_field_t * tf = (text_field_t *) link;
-			*visible = tf->visible; *state = tf->state;
-			*trackable = 0; *longpress = 0; *repeat = 0;
-			*x1 = (tf->x1) < 0 ? 0 : (tf->x1);
-			*x2 = (tf->x1 + tf->w) > gui_sizes.max_w ? gui_sizes.max_w : (tf->x1 + tf->w);
-			*y1 = (tf->y1) < 0 ? 0 : (tf->y1);
-			*y2 = (tf->y1 + tf->h) > gui_sizes.max_h ? gui_sizes.max_h : (tf->y1 + tf->h);
-		}
-		break;
+	{
+		text_field_t * tf = (text_field_t *) link;
+		* visible = tf->visible;
+		* state = tf->state;
+		* trackable = 0;
+		* longpress = 0;
+		* repeat = 0;
+		* x1 = (tf->x1) < 0 ? 0 : (tf->x1);
+		* x2 = (tf->x1 + tf->w) > gui_sizes.max_w ? gui_sizes.max_w : (tf->x1 + tf->w);
+		* y1 = (tf->y1) < 0 ? 0 : (tf->y1);
+		* y2 = (tf->y1 + tf->h) > gui_sizes.max_h ? gui_sizes.max_h : (tf->y1 + tf->h);
+	}
+	break;
 
 	default:
-		*visible = 0; *state = 0; *trackable = 0; *longpress = 0; *repeat = 0;
-		*x1 = 0; *y1 = 0; *x2 = 0; *y2 = 0;
+		* visible = 0;
+		* state = 0;
+		* trackable = 0;
+		* longpress = 0;
+		* repeat = 0;
+		* x1 = 0;
+		* y1 = 0;
+		* x2 = 0;
+		* y2 = 0;
 		break;
 	}
 }
@@ -423,21 +470,25 @@ static int check_one(obj_type_t t, void * lk, window_t * w, uint16_t px, uint16_
 	uint16_t x1, y1, x2, y2;
 	uint8_t vis, st, tr, lp, rp;
 
-	element_touch_info(t, lk, &x1, &y1, &x2, &y2, &vis, &st, &tr, &lp, &rp);
+	element_touch_info(t, lk, & x1, & y1, & x2, & y2, & vis, & st, & tr, & lp, & rp);
 
 	if (vis == VISIBLE && st != DISABLED
 			&& w->x1 + x1 < px && w->x1 + x2 > px
 			&& w->y1 + y1 < py && w->y1 + y2 > py)
 	{
-		*o_link = lk; *o_type = t; *o_win = w;
-		*o_tr = tr; *o_lp = lp; *o_rp = rp;
+		* o_link = lk;
+		* o_type = t;
+		* o_win = w;
+		* o_tr = tr;
+		* o_lp = lp;
+		* o_rp = rp;
 		return 1;
 	}
 	return 0;
 }
 
 /* Hit-test: обход открытых окон сверху вниз, внутри окна — типы в обратном
-   порядке (CLOSE, TEXT_FIELD, TOUCH_AREA, SLIDER, LABEL, BUTTON). */
+   порядке (CLOSE, TEXT_FIELD, TOUCH_AREA, SLIDER, SWITCH, LABEL, BUTTON). */
 static int hit_test(uint16_t px, uint16_t py,
 		void ** o_link, obj_type_t * o_type, window_t ** o_win,
 		uint8_t * o_tr, uint8_t * o_lp, uint8_t * o_rp)
@@ -447,16 +498,25 @@ static int hit_test(uint16_t px, uint16_t py,
 		window_t * w = get_win(gui.win[wi]);
 		if (w->state != VISIBLE)
 			continue;
+
 		if (w->is_close && check_one(TYPE_CLOSE_BUTTON, &w->close_button, w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp))
 			return 1;
+
 		for (int i = (int) w->tf_count - 1; i >= 0; i--)
 			if (check_one(TYPE_TEXT_FIELD, &w->tf_ptr[i], w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp)) return 1;
+
 		for (int i = (int) w->ta_count - 1; i >= 0; i--)
 			if (check_one(TYPE_TOUCH_AREA, &w->ta_ptr[i], w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp)) return 1;
+
 		for (int i = (int) w->sh_count - 1; i >= 0; i--)
 			if (check_one(TYPE_SLIDER, &w->sh_ptr[i], w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp)) return 1;
+
+		for (int i = (int) w->sw_count - 1; i >= 0; i--)
+			if (check_one(TYPE_SWITCH, &w->sw_ptr[i], w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp)) return 1;
+
 		for (int i = (int) w->lh_count - 1; i >= 0; i--)
 			if (check_one(TYPE_LABEL, &w->lh_ptr[i], w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp)) return 1;
+
 		for (int i = (int) w->bh_count - 1; i >= 0; i--)
 			if (check_one(TYPE_BUTTON, &w->bh_ptr[i], w, px, py, o_link, o_type, o_win, o_tr, o_lp, o_rp)) return 1;
 	}
@@ -475,12 +535,19 @@ static void draw_window_objects(window_t * win)
 {
 	for (uint8_t i = 0; i < win->bh_count; i++)
 		if (win->bh_ptr[i].visible) draw_button(&win->bh_ptr[i]);
+
 	for (uint8_t i = 0; i < win->lh_count; i++)
 		if (win->lh_ptr[i].visible) draw_label(&win->lh_ptr[i]);
+
 	for (uint8_t i = 0; i < win->sh_count; i++)
 		if (win->sh_ptr[i].visible) draw_slider(&win->sh_ptr[i]);
+
+	for (uint8_t i = 0; i < win->sw_count; i++)
+		if (win->sw_ptr[i].visible) draw_switch(&win->sw_ptr[i]);
+
 	for (uint8_t i = 0; i < win->tf_count; i++)
 		if (win->tf_ptr[i].visible) draw_textfield(&win->tf_ptr[i]);
+
 	if (win->is_close && win->close_button.visible)
 		draw_close_button(&win->close_button);
 }
@@ -542,6 +609,21 @@ static void set_state_record(window_t * win, obj_type_t type, void * link, uint8
 			}
 		}
 		break;
+
+	case TYPE_SWITCH:
+	{
+		switch_t * sw = (switch_t *) link;
+		sw->state = state;
+		if (sw->state == RELEASED)
+		{
+			sw->payload = sw->payload ? 0 : 1;			// инверсия состояния
+			gui_anim_start(&sw->anim, sw->payload ? 100 : 0, switch_anim_duration_ms, GUI_EASE_IN_OUT);
+
+			if (! put_to_wm_queue(win, WM_MESSAGE_ACTION, TYPE_SWITCH, PRESSED, sw->name))
+				dump_queue(win);
+		}
+	}
+	break;
 
 	case TYPE_LABEL:
 		{
