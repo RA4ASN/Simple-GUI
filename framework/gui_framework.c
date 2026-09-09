@@ -616,8 +616,7 @@ static void set_state_record(window_t * win, obj_type_t type, void * link, uint8
 		sw->state = state;
 		if (sw->state == RELEASED)
 		{
-			sw->payload = sw->payload ? 0 : 1;			// инверсия состояния
-			gui_anim_start(&sw->anim, sw->payload ? 100 : 0, switch_anim_duration_ms, GUI_EASE_IN_OUT);
+			switch_set_payload(sw, !sw->payload, 1);
 
 			if (! put_to_wm_queue(win, WM_MESSAGE_ACTION, TYPE_SWITCH, PRESSED, sw->name))
 				dump_queue(win);

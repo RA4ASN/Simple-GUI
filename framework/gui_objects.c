@@ -84,6 +84,25 @@ void draw_label(label_t * lh)
 
 // *************** Switches ****************
 
+/* Установка состояния переключателя с опциональной анимацией.
+   animate = 0: мгновенная установка (для инициализации окна)
+   animate = 1: плавная анимация (для физического нажатия) */
+void switch_set_payload(switch_t * sw, int new_payload, uint8_t animate)
+{
+	new_payload = new_payload ? 1 : 0;
+	if (sw->payload == new_payload) return;
+
+	sw->payload = new_payload;
+
+	if (animate) {
+		// Запуск анимации от текущего значения к целевому
+		gui_anim_start(&sw->anim, sw->payload ? 100 : 0, switch_anim_duration_ms, GUI_EASE_IN_OUT);
+	} else {
+		// Мгновенная установка без анимации
+		gui_anim_set(&sw->anim, sw->payload ? 100 : 0);
+	}
+}
+
 /* Пересчёт метрик подписи и полного габарита переключателя.
    Вызывается при создании, смене текста, позиции подписи и размеров тела. */
 static void switch_update_layout(switch_t * sw)
@@ -495,9 +514,9 @@ static void save_arrange_area(window_t * win, uint16_t x, uint16_t y, uint16_t w
 //                           size        - длина шкалы в пикселях
 //                           step        - шаг изменения значения (если 0, принудительно ставится 1)
 //
-// TYPE_SWITCH (sw_):        int w, int h, int on
+// TYPE_SWITCH (sw_):        int w, int h, char * caption
 //                           w, h - размеры переключателя в пикселях
-//                           on   - начальное состояние (0 - выключен, 1 - включен)
+//                           caption - подпись переключателя
 uint8_t gui_obj_create(const char * name, ...)
 {
 	uint8_t idx, window_id = get_parent_window();
@@ -523,14 +542,19 @@ uint8_t gui_obj_create(const char * name, ...)
 		sw->parent = window_id;
 		sw->sw_w = va_arg(arg, int);
 		sw->sw_h = va_arg(arg, int);
-		sw->payload = va_arg(arg, int) ? 1 : 0;
+		strncpy(sw->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
+		sw->text[TEXT_ARRAY_SIZE - 1] = '\0';
 		strncpy(sw->name, obj_name, NAME_ARRAY_SIZE);
 		sw->visible = 1;
 		sw->index = win->sw_count;
+		sw->caption_align = SWITCH_CAPTION_LEFT;
 		sw->x = 0;
 		sw->y = 0;
 		sw->font = gui_sdl2_get_label_font();
+		sw->payload = 0;
+
 		gui_anim_set(& sw->anim, sw->payload ? 100 : 0);
+		switch_update_layout(sw);
 
 		idx = win->sw_count;
 		win->sw_count ++;
@@ -977,7 +1001,7 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_POS_X) sw->x = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS_Y) sw->y = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { sw->x = va_arg(arg, int); sw->y = va_arg(arg, int); }
-		else if (prop == GUI_OBJ_PAYLOAD) sw->payload = va_arg(arg, int) ? 1 : 0;
+		else if (prop == GUI_OBJ_PAYLOAD) { switch_set_payload(sw, va_arg(arg, int), 0); }
 		else if (prop == GUI_OBJ_STATE) sw->state = va_arg(arg, int);
 		else if (prop == GUI_OBJ_COLOR) sw->color_on = va_arg(arg, gui_color_t);
 		else if (prop == GUI_OBJ_TEXT) {

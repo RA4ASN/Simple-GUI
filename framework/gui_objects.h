@@ -27,6 +27,7 @@ void draw_close_button(button_t * bh);
 void draw_slider(slider_t * sl);
 
 void draw_switch(switch_t * sw);
+void switch_set_payload(switch_t * sw, int new_payload, uint8_t animate);
 
 void draw_canvas(canvas_t * ca);
 void gui_canvas_set_active(const char * name);

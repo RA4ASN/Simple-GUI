@@ -92,12 +92,13 @@ static inline void __gui_draw_rect(unsigned int x, unsigned int y,
 		SDL_RenderDrawRect(renderer, & rect);
 }
 
+#define GUI_RRECT_BATCH		64			// макс. элементов контура/заливки в одном пакете
+
 // Отрисовка прямоугольника со скругленными углами
 static inline void __gui_draw_rounded_rect(unsigned int x, unsigned int y,
 		unsigned int w, unsigned int h, unsigned int radius, gui_color_t color, unsigned int fill)
 {
 	if (w == 0 || h == 0) return;
-
 	SDL_Renderer * renderer = sdl2_get_renderer();
 	uint8_t r = radius;
 	if (r > w / 2) r = w / 2;
@@ -106,101 +107,84 @@ static inline void __gui_draw_rounded_rect(unsigned int x, unsigned int y,
 		__gui_draw_rect(x, y, w, h, color, fill);
 		return;
 	}
-
 	uint8_t cr = (color >> 16) & 0xFF;
 	uint8_t cg = (color >> 8) & 0xFF;
 	uint8_t cb = (color >> 0) & 0xFF;
 	uint8_t ca = (color >> 24) & 0xFF;
+	if (ca < 255)
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+	else
+		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
 	SDL_SetRenderDrawColor(renderer, cr, cg, cb, ca);
-
 	int x0 = x;
 	int y0 = y;
 	int x1 = x0 + w - 1;
 	int y1 = y0 + h - 1;
-
 	if (fill) {
-		/* 1. Центральные прямоугольники (без углов) */
-		if (w > 2 * r) {
-			SDL_RenderFillRect(renderer, &(SDL_Rect) {x0 + r, y0, w - 2 * r, h});
-		}
+		/* 1. Центральные прямоугольники (без углов) - одним пакетом */
+		SDL_Rect mid[3];
+		int m = 0;
+		if (w > 2 * r) mid[m++] = (SDL_Rect) {x0 + r, y0, w - 2 * r, h};
 		if (h > 2 * r) {
-			SDL_RenderFillRect(renderer, &(SDL_Rect) {x0, y0 + r, r, h - 2 * r});
-			SDL_RenderFillRect(renderer, &(SDL_Rect) {x1 - r + 1, y0 + r, r, h - 2 * r});
+			mid[m++] = (SDL_Rect) {x0, y0 + r, r, h - 2 * r};
+			mid[m++] = (SDL_Rect) {x1 - r + 1, y0 + r, r, h - 2 * r};
 		}
-
-		/* Вспомогательная функция для заливки четверти круга */
-#define FILL_QUARTER_CIRCLE(cx, cy, sign_x, sign_y) 				\
-            do { 													\
-                for (int dy = 0; dy <= r; dy++) { 					\
-                    int dx = (int)sqrt((double)(r * r - dy * dy)); 	\
-                    for (int dx2 = 0; dx2 <= dx; dx2++) { 			\
-                        SDL_RenderDrawPoint(renderer, 				\
-                            (cx) + (sign_x) * dx2, 					\
-                            (cy) + (sign_y) * dy); 					\
-                    }												\
-                } 													\
-            } while(0)
-
-		/* Top-left corner */
-		FILL_QUARTER_CIRCLE(x0 + r, y0 + r, -1, -1);
-		/* Top-right corner */
-		FILL_QUARTER_CIRCLE(x1 - r, y0 + r, 1, -1);
-		/* Bottom-left corner */
-		FILL_QUARTER_CIRCLE(x0 + r, y1 - r, -1, 1);
-		/* Bottom-right corner */
-		FILL_QUARTER_CIRCLE(x1 - r, y1 - r, 1, 1);
-
-#undef FILL_QUARTER_CIRCLE
+		if (m) SDL_RenderFillRects(renderer, mid, m);
+		/* 2. Углы: построчные полосы четвертей круга, пакеты точных SDL_Rect */
+		SDL_Rect batch[4 * GUI_RRECT_BATCH];
+		for (int i0 = 0; i0 < r; i0 += GUI_RRECT_BATCH) {
+			int i1 = i0 + GUI_RRECT_BATCH;
+			if (i1 > r) i1 = r;
+			int n = 0;
+			for (int i = i0; i < i1; i ++) {
+				int dyv = r - i;									// расстояние строки от центра скругления
+				int hw = (int) lround(sqrt((double) (r * r - dyv * dyv)));
+				if (hw <= 0) continue;
+				batch[n++] = (SDL_Rect) {x0 + r - hw, y0 + i, hw, 1};		// top-left
+				batch[n++] = (SDL_Rect) {x1 - r + 1, y0 + i, hw, 1};		// top-right
+				batch[n++] = (SDL_Rect) {x0 + r - hw, y1 - i, hw, 1};		// bottom-left
+				batch[n++] = (SDL_Rect) {x1 - r + 1, y1 - i, hw, 1};		// bottom-right
+			}
+			if (n) SDL_RenderFillRects(renderer, batch, n);
+		}
 	}
 	else
 	{
+		/* Прямые участки контура */
 		SDL_RenderDrawLine(renderer, x0 + r, y0, x1 - r, y0); // top
 		SDL_RenderDrawLine(renderer, x0 + r, y1, x1 - r, y1); // bottom
 		SDL_RenderDrawLine(renderer, x0, y0 + r, x0, y1 - r); // left
 		SDL_RenderDrawLine(renderer, x1, y0 + r, x1, y1 - r); // right
-
-		// === ДУГИ ===
-		const int segments = r;
-		SDL_Point pts[4 * (segments + 1)];
-		int idx = 0;
-
-		// Top-left arc: from (x0+r, y0) to (x0, y0+r)
-		for (int i = 0; i <= segments; i ++)
-		{
-			double t = (M_PI / 2.0) * i / segments; // t: 0 → π/2
-			int px = x0 + r - (int)(r * cos(t));
-			int py = y0 + r - (int)(r * sin(t));
-			pts[idx++] = (SDL_Point){px, py};
-		}
-
-		// Top-right arc: from (x1-r, y0) to (x1, y0+r)
-		for (int i = 0; i <= segments; i ++)
-		{
-			double t = (M_PI / 2.0) * i / segments;
-			int px = x1 - r + (int)(r * cos(t));
-			int py = y0 + r - (int)(r * sin(t));
-			pts[idx++] = (SDL_Point){px, py};
-		}
-
-		// Bottom-right arc: from (x1, y1-r) to (x1-r, y1)
-		for (int i = 0; i <= segments; i ++)
-		{
-			double t = (M_PI / 2.0) * i / segments;
-			int px = x1 - r + (int)(r * cos(t));
-			int py = y1 - r + (int)(r * sin(t));
-			pts[idx++] = (SDL_Point){px, py};
-		}
-
-		// Bottom-left arc: from (x0, y1-r) to (x0+r, y1)
-		for (int i = 0; i <= segments; i ++)
-		{
-			double t = (M_PI / 2.0) * i / segments;
-			int px = x0 + r - (int)(r * cos(t));
-			int py = y1 - r + (int)(r * sin(t));
-			pts[idx++] = (SDL_Point){px, py};
-		}
-
-		SDL_RenderDrawPoints(renderer, pts, idx);
+		/* Дуги: непрерывные полилинии с шагом <= 1 px, пакеты SDL_RenderDrawLines.
+		   Концы дуг точно совпадают с концами прямых участков - контур сплошной. */
+		const int segments = 2 * r;
+		SDL_Point arc[GUI_RRECT_BATCH + 1];
+#define DRAW_ARC(cx, cy, sx, sy) 									\
+		do { 														\
+			int s0 = 0; 											\
+			while (s0 < segments) { 								\
+				int s1 = s0 + GUI_RRECT_BATCH; 						\
+				if (s1 > segments) s1 = segments; 					\
+				int n = 0; 											\
+				for (int s = s0; s <= s1; s ++) { 					\
+					double t = (M_PI / 2.0) * s / segments; 		\
+					arc[n].x = (cx) + (sx) * (int) lround(r * cos(t)); 	\
+					arc[n].y = (cy) + (sy) * (int) lround(r * sin(t)); 	\
+					n ++; 											\
+				} 													\
+				if (n >= 2) SDL_RenderDrawLines(renderer, arc, n); 	\
+				s0 = s1; 											\
+			} 														\
+		} while(0)
+		/* Top-left arc: from (x0, y0+r) to (x0+r, y0) */
+		DRAW_ARC(x0 + r, y0 + r, -1, -1);
+		/* Top-right arc: from (x1, y0+r) to (x1-r, y0) */
+		DRAW_ARC(x1 - r, y0 + r, 1, -1);
+		/* Bottom-right arc: from (x1, y1-r) to (x1-r, y1) */
+		DRAW_ARC(x1 - r, y1 - r, 1, 1);
+		/* Bottom-left arc: from (x0, y1-r) to (x0+r, y1) */
+		DRAW_ARC(x0 + r, y1 - r, -1, 1);
+#undef DRAW_ARC
 	}
 }
 
