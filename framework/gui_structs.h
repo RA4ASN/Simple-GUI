@@ -234,6 +234,9 @@ typedef struct {
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
 	TTF_Font* font;
+	uint16_t line1_w;				// ширина первой строки в пикселях (кэш)
+	uint16_t line2_w;				// ширина второй строки (0, если одна строка)
+	uint8_t sep_pos;				// позиция разделителя '|' в text (0, если нет)
 } button_t;
 
 typedef struct {

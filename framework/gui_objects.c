@@ -196,13 +196,37 @@ void draw_switch(switch_t * sw)
 }
 
 // *************** Buttons ****************
+/* Пересчёт кэша метрик двухстрочного текста: позиция разделителя и ширины строк.
+   Вызывается при создании кнопки и при любом изменении её текста/шрифта. */
+void button_update_text_metrics(button_t * bh)
+{
+	const char * sep = strchr(bh->text, '|');
 
+	if (sep) {
+		bh->sep_pos = (uint8_t) (sep - bh->text);
+		char tmp[TEXT_ARRAY_SIZE];
+		int n1 = bh->sep_pos < TEXT_ARRAY_SIZE - 1 ? bh->sep_pos : TEXT_ARRAY_SIZE - 1;
+		memcpy(tmp, bh->text, n1);
+		tmp[n1] = '\0';
+		int w1 = 0, h1 = 0;
+		gui_sdl2_get_text_size(tmp, bh->font, &w1, &h1);
+		bh->line1_w = (uint16_t) w1;
+		int w2 = 0, h2 = 0;
+		gui_sdl2_get_text_size(sep + 1, bh->font, &w2, &h2);
+		bh->line2_w = (uint16_t) w2;
+	} else {
+		bh->sep_pos = 0;
+		int w = 0, h = 0;
+		gui_sdl2_get_text_size(bh->text, bh->font, &w, &h);
+		bh->line1_w = (uint16_t) w;
+		bh->line2_w = 0;
+	}
+}
 void draw_button(button_t * bh)
 {
 	window_t * win = get_win(bh->parent);
 	uint16_t x = win->x1 + bh->x1;
 	uint16_t y = win->y1 + bh->y1;
-
 	gui_color_t c1 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED :
 			(bh->is_locked ? GUI_COLOR_BUTTON_LOCKED : GUI_COLOR_BUTTON_NON_LOCKED);
 	gui_color_t c2 = bh->state == DISABLED ? GUI_COLOR_BUTTON_DISABLED :
@@ -213,41 +237,25 @@ void draw_button(button_t * bh)
 	__gui_draw_rounded_rect(x + 2, y + 2, bh->w - 5, bh->h - 5, button_round_radius, bh->state == PRESSED ? c2 : c1, 1);
 
 	/* Отрисовка текста кнопки */
+	if (!bh->line1_w && bh->text[0])	// самовосстановление при пустом кэше
+		button_update_text_metrics(bh);
+
 	const uint16_t shiftX = bh->state == PRESSED ? 1 : 0;
 	const uint16_t shiftY = bh->state == PRESSED ? 1 : 0;
 	const gui_color_t textcolor = GUI_COLOR_BLACK;
+	const int line_h = TTF_FontHeight(bh->font);
 
-    static const char delimeters[] = "|";
-    if (strchr(bh->text, delimeters[0]) == NULL)
-    {
-        int tw, th;
-        gui_sdl2_get_text_size(bh->text, bh->font, &tw, &th);
-        gui_sdl2_draw_text(bh->text, shiftX + x + (bh->w - tw) / 2, shiftY + y + (bh->h - th) / 2, bh->font, textcolor);
-    }
-    else
-    {
-        char buf[TEXT_ARRAY_SIZE];
-        strcpy(buf, bh->text);
-        char *next;
-        int line_h = TTF_FontHeight(bh->font);
-        int total_h = line_h * 2;
-        int y_start = shiftY + y + (bh->h - total_h) / 2;
-
-        char *text2 = strtok_r(buf, delimeters, &next);
-        if (text2) {
-            int tw1, th1;
-            gui_sdl2_get_text_size(text2, bh->font, &tw1, &th1);
-            gui_sdl2_draw_text(text2, shiftX + x + (bh->w - tw1) / 2, y_start, bh->font, textcolor);
-        }
-
-        text2 = strtok_r(NULL, delimeters, &next);
-        if (text2) {
-            int tw2, th2;
-            gui_sdl2_get_text_size(text2, bh->font, &tw2, &th2);
-            gui_sdl2_draw_text(text2, shiftX + x + (bh->w - tw2) / 2, y_start + line_h, bh->font, textcolor);
-        }
-    }
-
+	if (!bh->sep_pos) {
+		gui_sdl2_draw_text(bh->text, shiftX + x + (bh->w - bh->line1_w) / 2, shiftY + y + (bh->h - line_h) / 2, bh->font, textcolor);
+	} else {
+		char tmp[TEXT_ARRAY_SIZE];
+		int n1 = bh->sep_pos < TEXT_ARRAY_SIZE - 1 ? bh->sep_pos : TEXT_ARRAY_SIZE - 1;
+		memcpy(tmp, bh->text, n1);
+		tmp[n1] = '\0';
+		const int y_start = shiftY + y + (bh->h - line_h * 2) / 2;
+		gui_sdl2_draw_text(tmp, shiftX + x + (bh->w - bh->line1_w) / 2, y_start, bh->font, textcolor);
+		gui_sdl2_draw_text(bh->text + bh->sep_pos + 1, shiftX + x + (bh->w - bh->line2_w) / 2, y_start + line_h, bh->font, textcolor);
+	}
 	if (bh->is_focus)
 		gui_drawDashedRectangle(x + 4, y + 4, bh->w - 8, bh->h - 8, 4, GUI_COLOR_BLACK);
 }
@@ -627,7 +635,6 @@ uint8_t gui_obj_create(const char * name, ...)
 
 		button_t * bh = & win->bh_ptr[win->bh_count];
 		memcpy(bh, & button_default, sizeof(button_t));
-
 		bh->parent = window_id;
 		bh->w = va_arg(arg, int);
 		bh->h = va_arg(arg, int);
@@ -639,7 +646,8 @@ uint8_t gui_obj_create(const char * name, ...)
 		bh->index = win->bh_count;
 		bh->x1 = 0;
 		bh->y1 = 0;
-        bh->font = gui_sdl2_get_button_font();
+		bh->font = gui_sdl2_get_button_font();
+		button_update_text_metrics(bh);			// кэш метрик текста с момента создания
 
 		idx = win->bh_count;
 		win->bh_count ++;
@@ -1100,8 +1108,16 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_POS_Y) bh->y1 = va_arg(arg, int);
 		else if (prop == GUI_OBJ_POS) { bh->x1 = va_arg(arg, int); bh->y1 = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_PAYLOAD) bh->payload = va_arg(arg, int);
-		else if (prop == GUI_OBJ_TEXT) strncpy(bh->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
-		else if (prop == GUI_OBJ_TEXT_FMT) vsnprintf(bh->text, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
+		else if (prop == GUI_OBJ_TEXT) {
+			strncpy(bh->text, va_arg(arg, char *), TEXT_ARRAY_SIZE - 1);
+			bh->text[TEXT_ARRAY_SIZE - 1] = '\0';
+			button_update_text_metrics(bh);
+		}
+		else if (prop == GUI_OBJ_TEXT_FMT) {
+			vsnprintf(bh->text, TEXT_ARRAY_SIZE - 1, va_arg(arg, char *), arg);
+			bh->text[TEXT_ARRAY_SIZE - 1] = '\0';
+			button_update_text_metrics(bh);
+		}
 		else if (prop == GUI_OBJ_STATE) bh->state = va_arg(arg, int);
 		else if (prop == GUI_OBJ_LOCK) bh->is_locked = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_WIDTH) bh->w = va_arg(arg, int);
@@ -1109,7 +1125,10 @@ void gui_obj_set_prop(const char * name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_SIZE) { bh->w = va_arg(arg, int); bh->h = va_arg(arg, int); }
 		else if (prop == GUI_OBJ_REPEAT) bh->is_repeating = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_LONG_PRESS) bh->is_long_press = !! va_arg(arg, int);
-		else if (prop == GUI_OBJ_FONT) { bh->font = va_arg(arg, TTF_Font *); }
+		else if (prop == GUI_OBJ_FONT) {
+			bh->font = va_arg(arg, TTF_Font *);
+			button_update_text_metrics(bh);
+		}
 		break;
 	}
 	case TYPE_SLIDER:

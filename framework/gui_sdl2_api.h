@@ -66,26 +66,53 @@ static inline int _sdl2_print_error_impl(const char* file, int line) {
         _r; \
     })
 
+/* Кэш последнего установленного цвета, режима блендинга и рендерера.
+   Позволяет избежать повторных вызовов SDL_SetRenderDrawColor/BlendMode
+   при последовательной отрисовке примитивов одного цвета. */
+static SDL_Renderer *gui_last_renderer = NULL;
+static uint32_t gui_last_color = 0xFFFFFFFF;
+static int gui_last_blend_mode = -1;
+
+static inline void gui_set_draw_color(SDL_Renderer *r, uint32_t color)
+{
+	if (r != gui_last_renderer || color != gui_last_color) {
+		SDL_SetRenderDrawColor(r,
+			(color >> 16) & 0xFF,
+			(color >> 8) & 0xFF,
+			(color >> 0) & 0xFF,
+			(color >> 24) & 0xFF);
+		gui_last_renderer = r;
+		gui_last_color = color;
+	}
+}
+
+static inline void gui_set_blend_mode(SDL_Renderer *r, int mode)
+{
+	if (gui_last_blend_mode != mode) {
+		SDL_SetRenderDrawBlendMode(r, (SDL_BlendMode)mode);
+		gui_last_blend_mode = mode;
+	}
+}
+
+/* Пакетная отрисовка точек — один вызов SDL_RenderDrawPoints вместо N вызовов
+   SDL_RenderDrawPoint (для пунктирных рамок и других точечных примитивов). */
+static inline void __gui_draw_points(const SDL_Point * points, int count, gui_color_t color)
+{
+	if (count <= 0) return;
+	SDL_Renderer * renderer = sdl2_get_renderer();
+	gui_set_blend_mode(renderer, ((color >> 24) & 0xFF) < 255 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+	gui_set_draw_color(renderer, color);
+	SDL_RenderDrawPoints(renderer, points, count);
+}
+
 // Отрисовка закрашенного прямоугольника
 static inline void __gui_draw_rect(unsigned int x, unsigned int y,
 		unsigned int w, unsigned int h, gui_color_t color, unsigned int fill)
 {
 	SDL_Renderer * renderer = sdl2_get_renderer();
-
-	uint8_t r = (color >> 16) & 0xFF;
-	uint8_t g = (color >> 8) & 0xFF;
-	uint8_t b = (color >> 0) & 0xFF;
-	uint8_t a = (color >> 24) & 0xFF;
-
 	SDL_Rect rect = { .x = x, .y = y, .w = w, .h = h };
-
-	if (a < 255)
-		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-	else
-		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-
-	SDL_SetRenderDrawColor(renderer, r, g, b, a);
-
+	gui_set_blend_mode(renderer, ((color >> 24) & 0xFF) < 255 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+	gui_set_draw_color(renderer, color);
 	if (fill)
 		SDL_RenderFillRect(renderer, & rect);
 	else
@@ -112,10 +139,10 @@ static inline void __gui_draw_rounded_rect(unsigned int x, unsigned int y,
 	uint8_t cb = (color >> 0) & 0xFF;
 	uint8_t ca = (color >> 24) & 0xFF;
 	if (ca < 255)
-		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+		gui_set_blend_mode(renderer, SDL_BLENDMODE_BLEND);
 	else
-		SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_NONE);
-	SDL_SetRenderDrawColor(renderer, cr, cg, cb, ca);
+		gui_set_blend_mode(renderer, SDL_BLENDMODE_NONE);
+	gui_set_draw_color(renderer, color);
 	int x0 = x;
 	int y0 = y;
 	int x1 = x0 + w - 1;
@@ -192,40 +219,26 @@ static inline void __gui_draw_line(unsigned int x1, unsigned int y1,
 		unsigned int x2, unsigned int y2, gui_color_t color)
 {
 	SDL_Renderer * renderer = sdl2_get_renderer();
-
-	uint8_t r = (color >> 16) & 0xFF;
-	uint8_t g = (color >> 8) & 0xFF;
-	uint8_t b = (color >> 0) & 0xFF;
-	uint8_t a = (color >> 24) & 0xFF;
-
-	SDL_SetRenderDrawColor(renderer, r, g, b, a);
+	gui_set_blend_mode(renderer, ((color >> 24) & 0xFF) < 255 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+	gui_set_draw_color(renderer, color);
 	SDL_RenderDrawLine(renderer, x1, y1, x2, y2);
 }
 
 static inline void __gui_draw_point(unsigned int x, unsigned int y, gui_color_t color)
 {
 	SDL_Renderer * renderer = sdl2_get_renderer();
-
-	uint8_t r = (color >> 16) & 0xFF;
-	uint8_t g = (color >> 8) & 0xFF;
-	uint8_t b = (color >> 0) & 0xFF;
-	uint8_t a = (color >> 24) & 0xFF;
-
-	SDL_SetRenderDrawColor(renderer, r, g, b, a);
+	gui_set_blend_mode(renderer, ((color >> 24) & 0xFF) < 255 ? SDL_BLENDMODE_BLEND : SDL_BLENDMODE_NONE);
+	gui_set_draw_color(renderer, color);
 	SDL_RenderDrawPoint(renderer, x, y);
 }
 
 static inline void __gui_draw_semitransparent_rect(unsigned int x1, unsigned int y1,
-	unsigned int x2, unsigned int y2, gui_color_t color, unsigned int alpha)
+		unsigned int x2, unsigned int y2, gui_color_t color, unsigned int alpha)
 {
 	SDL_Renderer * renderer = sdl2_get_renderer();
-	uint8_t r = (color >> 16) & 0xFF;
-	uint8_t g = (color >> 8) & 0xFF;
-	uint8_t b = (color >> 0) & 0xFF;
-	uint8_t a = (uint8_t) alpha;
 	SDL_Rect rect = { .x = x1, .y = y1, .w = (x2 - x1), .h = (y2 - y1) };
-	SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
-	SDL_SetRenderDrawColor(renderer, r, g, b, a);
+	gui_set_blend_mode(renderer, SDL_BLENDMODE_BLEND);
+	gui_set_draw_color(renderer, (color & 0x00FFFFFF) | ((uint32_t)(uint8_t) alpha << 24));
 	SDL_RenderFillRect(renderer, & rect);
 }
 

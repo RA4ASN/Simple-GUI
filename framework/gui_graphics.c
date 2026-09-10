@@ -97,33 +97,34 @@ void gui_drawpoint(uint16_t x1, uint16_t y1, gui_color_t color)
 
 void gui_drawDashedRectangle(uint16_t x, uint16_t y, uint16_t width, uint16_t height, uint16_t dashLength, gui_color_t color)
 {
-    if (width == 0 || height == 0 || dashLength == 0) return;
-
-    uint16_t x1 = x;
-    uint16_t y1 = y;
-    uint16_t x2 = x + width - 1;
-    uint16_t y2 = y + height - 1;
-    uint16_t pos = 0;
-
-    // Верхняя линия (слева направо)
-    for (uint16_t i = 0; i < width; i ++)
-        if ((pos ++ / dashLength) % 2 == 0)
-        	__gui_draw_point(x1 + i, y1, color);
-
-    // Правая линия (сверху вниз)
-    for (uint16_t i = 1; i < height; i ++)
-        if ((pos ++ / dashLength) % 2 == 0)
-        	__gui_draw_point(x2, y1 + i, color);
-
-    // Нижняя линия (справа налево)
-    for (uint16_t i = 1; i < width; i ++)
-        if ((pos ++ / dashLength) % 2 == 0)
-        	__gui_draw_point(x2 - i, y2, color);
-
-    // Левая линия (снизу вверх)
-    for (uint16_t i = 1; i < height - 1; i ++)
-        if ((pos ++ / dashLength) % 2 == 0)
-        	__gui_draw_point(x1, y2 - i, color);
+	if (width == 0 || height == 0 || dashLength == 0)
+		return;
+	uint16_t x1 = x;
+	uint16_t y1 = y;
+	uint16_t x2 = x + width - 1;
+	uint16_t y2 = y + height - 1;
+	uint16_t pos = 0;
+	/* Максимальное количество точек в пунктирной рамке: периметр / 2 */
+	SDL_Point points[(width + height) * 2];
+	int n = 0;
+	// Верхняя линия (слева направо)
+	for (uint16_t i = 0; i < width; i++)
+		if ((pos++ / dashLength) % 2 == 0)
+			points[n++] = (SDL_Point ) { x1 + i, y1 };
+	// Правая линия (сверху вниз)
+	for (uint16_t i = 1; i < height; i++)
+		if ((pos++ / dashLength) % 2 == 0)
+			points[n++] = (SDL_Point ) { x2, y1 + i };
+	// Нижняя линия (справа налево)
+	for (uint16_t i = 1; i < width; i++)
+		if ((pos++ / dashLength) % 2 == 0)
+			points[n++] = (SDL_Point ) { x2 - i, y2 };
+	// Левая линия (снизу вверх)
+	for (uint16_t i = 1; i < height - 1; i++)
+		if ((pos++ / dashLength) % 2 == 0)
+			points[n++] = (SDL_Point ) { x1, y2 - i };
+	if (n > 0)
+		__gui_draw_points(points, n, color);
 }
 
 // ********** Drawing into Canvases **********************
@@ -225,7 +226,6 @@ void gui_canvas_draw_dashed_rectangle(uint16_t x, uint16_t y, uint16_t width, ui
 	canvas_t * ca = win->ca_current;
 	if (ca == NULL) return;
 	if (width == 0 || height == 0 || dashLength == 0) return;
-
 	const uint16_t ox = win->draw_x1 + ca->x;
 	const uint16_t oy = win->draw_y1 + ca->y;
 	uint16_t x1 = x + ox;
@@ -233,23 +233,26 @@ void gui_canvas_draw_dashed_rectangle(uint16_t x, uint16_t y, uint16_t width, ui
 	uint16_t x2 = x + ox + width - 1;
 	uint16_t y2 = y + oy + height - 1;
 	uint16_t pos = 0;
-
+	SDL_Point points[(width + height) * 2];
+	int n = 0;
 	// Верхняя линия (слева направо)
 	for (uint16_t i = 0; i < width; i ++)
 		if ((pos ++ / dashLength) % 2 == 0)
-			__gui_draw_point(x1 + i, y1, color);
+			points[n++] = (SDL_Point){x1 + i, y1};
 	// Правая линия (сверху вниз)
 	for (uint16_t i = 1; i < height; i ++)
 		if ((pos ++ / dashLength) % 2 == 0)
-			__gui_draw_point(x2, y1 + i, color);
+			points[n++] = (SDL_Point){x2, y1 + i};
 	// Нижняя линия (справа налево)
 	for (uint16_t i = 1; i < width; i ++)
 		if ((pos ++ / dashLength) % 2 == 0)
-			__gui_draw_point(x2 - i, y2, color);
+			points[n++] = (SDL_Point){x2 - i, y2};
 	// Левая линия (снизу вверх)
 	for (uint16_t i = 1; i < height - 1; i ++)
 		if ((pos ++ / dashLength) % 2 == 0)
-			__gui_draw_point(x1, y2 - i, color);
+			points[n++] = (SDL_Point){x1, y2 - i};
+	if (n > 0)
+		__gui_draw_points(points, n, color);
 }
 
 #endif /* SIMPLE_GUI */

@@ -17,25 +17,35 @@
 #define SIZE_CACHE_SIZE 128
 #define TEX_CACHE_SIZE 128
 
+/* FNV-1a хэш для ускорения поиска строк в кэше */
+static inline uint32_t text_hash(const char * s)
+{
+	uint32_t h = 2166136261u;
+	while (*s) { h ^= (uint8_t) *s++; h *= 16777619u; }
+	return h;
+}
+
 typedef struct {
-    char text[TEXT_ARRAY_SIZE];
-    TTF_Font* font;
-    int w, h;
-    int valid;
-    int lru_counter;
+	char text[TEXT_ARRAY_SIZE];
+	TTF_Font* font;
+	uint32_t hash;				// FNV-1a хэш текста для быстрого сравнения
+	int w, h;
+	int valid;
+	int lru_counter;
 } gui_size_cache_entry_t;
 
 static gui_size_cache_entry_t size_cache[SIZE_CACHE_SIZE];
 static int size_lru_counter = 0;
 
 typedef struct {
-    char text[TEXT_ARRAY_SIZE];
-    TTF_Font* font;
-    SDL_Color color;
-    SDL_Texture* texture;
-    int w, h;
-    int valid;
-    int lru_counter;
+	char text[TEXT_ARRAY_SIZE];
+	TTF_Font* font;
+	SDL_Color color;
+	SDL_Texture* texture;
+	uint32_t hash;				// FNV-1a хэш текста
+	int w, h;
+	int valid;
+	int lru_counter;
 } gui_tex_cache_entry_t;
 
 static gui_tex_cache_entry_t tex_cache[TEX_CACHE_SIZE];
@@ -55,42 +65,49 @@ static uint32_t last_stats_tick = 0;
 
 void gui_sdl2_text_init(void)
 {
-    TTF_Init();
-
-    if (!btn_font) {
-        btn_font = TTF_OpenFont(BTN_FONT_PATH, gui_sizes.buttons_font_size);
-        if (!btn_font) printf("[GUI SDL2] Failed to load button font %s: %s\n", BTN_FONT_PATH, TTF_GetError());
-    }
-    if (!label_font) {
-        label_font = TTF_OpenFont(LABEL_FONT_PATH, gui_sizes.labels_font_size);
-        if (!label_font) printf("[GUI SDL2] Failed to load label font %s: %s\n", LABEL_FONT_PATH, TTF_GetError());
-    }
-    if (!title_font) {
-        title_font = TTF_OpenFont(WINDOW_TITLE_FONT_PATH, gui_sizes.win_title_font_size);
-        if (!title_font) printf("[GUI SDL2] Failed to load title font %s: %s\n", WINDOW_TITLE_FONT_PATH, TTF_GetError());
-    }
-    memset(size_cache, 0, sizeof(size_cache));
-    memset(tex_cache, 0, sizeof(tex_cache));
-    size_lru_counter = 0;
-    tex_lru_counter = 0;
-
+	TTF_Init();
+	if (!btn_font) {
+		btn_font = TTF_OpenFont(BTN_FONT_PATH, gui_sizes.buttons_font_size);
+		if (!btn_font) printf("[GUI SDL2] Failed to load button font %s: %s\n", BTN_FONT_PATH, TTF_GetError());
+	}
+	if (!label_font) {
+		label_font = TTF_OpenFont(LABEL_FONT_PATH, gui_sizes.labels_font_size);
+		if (!label_font) printf("[GUI SDL2] Failed to load label font %s: %s\n", LABEL_FONT_PATH, TTF_GetError());
+	}
+	if (!title_font) {
+		title_font = TTF_OpenFont(WINDOW_TITLE_FONT_PATH, gui_sizes.win_title_font_size);
+		if (!title_font) printf("[GUI SDL2] Failed to load title font %s: %s\n", WINDOW_TITLE_FONT_PATH, TTF_GetError());
+	}
+	memset(size_cache, 0, sizeof(size_cache));
+	memset(tex_cache, 0, sizeof(tex_cache));
+	size_lru_counter = 0;
+	tex_lru_counter = 0;
 #if GUI_SDL2_TEXT_CACHE_STATS
-    last_stats_tick = SDL_GetTicks();
+	last_stats_tick = SDL_GetTicks();
 #endif
 }
 
 void gui_sdl2_text_cleanup(void)
 {
-    for (int i = 0; i < TEX_CACHE_SIZE; i++) {
-        if (tex_cache[i].valid && tex_cache[i].texture) {
-            SDL_DestroyTexture(tex_cache[i].texture);
-            tex_cache[i].texture = NULL;
-            tex_cache[i].valid = 0;
-        }
-    }
-    if (btn_font) { TTF_CloseFont(btn_font); btn_font = NULL; }
-    if (label_font) { TTF_CloseFont(label_font); label_font = NULL; }
-    if (title_font) { TTF_CloseFont(title_font); title_font = NULL; }
+	for (int i = 0; i < TEX_CACHE_SIZE; i++) {
+		if (tex_cache[i].valid && tex_cache[i].texture) {
+			SDL_DestroyTexture(tex_cache[i].texture);
+			tex_cache[i].texture = NULL;
+			tex_cache[i].valid = 0;
+		}
+	}
+	if (btn_font) {
+		TTF_CloseFont(btn_font);
+		btn_font = NULL;
+	}
+	if (label_font) {
+		TTF_CloseFont(label_font);
+		label_font = NULL;
+	}
+	if (title_font) {
+		TTF_CloseFont(title_font);
+		title_font = NULL;
+	}
 }
 
 TTF_Font* gui_sdl2_get_button_font(void) { return btn_font; }
@@ -100,25 +117,21 @@ TTF_Font* gui_sdl2_get_window_title_font(void) { return title_font; }
 #if GUI_SDL2_TEXT_CACHE_STATS
 static void print_cache_stats(void)
 {
-    uint32_t current_tick = SDL_GetTicks();
-    if (current_tick - last_stats_tick >= 1000) {
-        uint32_t size_total = size_cache_hits_sec + size_cache_misses_sec;
-        uint32_t tex_total = tex_cache_hits_sec + tex_cache_misses_sec;
-
-        float size_rate = size_total > 0 ? (100.0f * size_cache_hits_sec) / size_total : 0.0f;
-        float tex_rate = tex_total > 0 ? (100.0f * tex_cache_hits_sec) / tex_total : 0.0f;
-
-        printf("[GUI SDL2 CACHE] 1s Stats -> Size: %u hits, %u misses (%.1f%%) | Tex: %u hits, %u misses (%.1f%%)\n",
-               size_cache_hits_sec, size_cache_misses_sec, size_rate,
-               tex_cache_hits_sec, tex_cache_misses_sec, tex_rate);
-
-        // Сброс счетчиков для следующей секунды
-        size_cache_hits_sec = 0;
-        size_cache_misses_sec = 0;
-        tex_cache_hits_sec = 0;
-        tex_cache_misses_sec = 0;
-        last_stats_tick = current_tick;
-    }
+	uint32_t current_tick = SDL_GetTicks();
+	if (current_tick - last_stats_tick >= 1000) {
+		uint32_t size_total = size_cache_hits_sec + size_cache_misses_sec;
+		uint32_t tex_total = tex_cache_hits_sec + tex_cache_misses_sec;
+		float size_rate = size_total > 0 ? (100.0f * size_cache_hits_sec) / size_total : 0.0f;
+		float tex_rate = tex_total > 0 ? (100.0f * tex_cache_hits_sec) / tex_total : 0.0f;
+		printf("[GUI SDL2 CACHE] 1s Stats -> Size: %u hits, %u misses (%.1f%%) | Tex: %u hits, %u misses (%.1f%%)\n",
+				size_cache_hits_sec, size_cache_misses_sec, size_rate,
+				tex_cache_hits_sec, tex_cache_misses_sec, tex_rate);
+		size_cache_hits_sec = 0;
+		size_cache_misses_sec = 0;
+		tex_cache_hits_sec = 0;
+		tex_cache_misses_sec = 0;
+		last_stats_tick = current_tick;
+	}
 }
 #endif
 
@@ -128,10 +141,11 @@ static gui_size_cache_entry_t* find_size_cache(const char* text, TTF_Font* font)
 	int min_lru = INT_MAX;
 	int min_lru_idx = 0;
 	int is_hit = 0;
-
+	uint32_t h = text_hash(text);
 	for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
 		if (size_cache[i].valid && size_cache[i].font == font
-				&& strcmp(size_cache[i].text, text) == 0) {
+			&& size_cache[i].hash == h
+			&& strcmp(size_cache[i].text, text) == 0) {
 			size_cache[i].lru_counter = ++size_lru_counter;
 			is_hit = 1;
 			min_lru_idx = i;
@@ -144,28 +158,20 @@ static gui_size_cache_entry_t* find_size_cache(const char* text, TTF_Font* font)
 			min_lru_idx = i;
 		}
 	}
-
-	int target_idx =
-			is_hit ?
-					min_lru_idx :
-					(first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
-
+	int target_idx = is_hit ? min_lru_idx : (first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
 #if GUI_SDL2_TEXT_CACHE_STATS
 	if (is_hit) size_cache_hits_sec++; else size_cache_misses_sec++;
 	print_cache_stats();
 #endif
-
-	// ХИТ: запись уже содержит актуальные w/h — возвращаем БЕЗ пересчёта
 	if (is_hit)
 		return &size_cache[target_idx];
-
-	// ПРОМАХ: считаем размер и заполняем ячейку
 	gui_size_cache_entry_t* entry = &size_cache[target_idx];
 	if (font && text) {
 		TTF_SizeText(font, text, &entry->w, &entry->h);
 		strncpy(entry->text, text, TEXT_ARRAY_SIZE - 1);
 		entry->text[TEXT_ARRAY_SIZE - 1] = '\0';
 		entry->font = font;
+		entry->hash = h;
 		entry->valid = 1;
 		entry->lru_counter = ++size_lru_counter;
 	}
@@ -179,14 +185,15 @@ static gui_tex_cache_entry_t* find_tex_cache(const char* text, TTF_Font* font,
 	int min_lru = INT_MAX;
 	int min_lru_idx = 0;
 	int is_hit = 0;
-
+	uint32_t h = text_hash(text);
 	for (int i = 0; i < TEX_CACHE_SIZE; i++) {
 		if (tex_cache[i].valid && tex_cache[i].font == font
-				&& tex_cache[i].color.r == color.r
-				&& tex_cache[i].color.g == color.g
-				&& tex_cache[i].color.b == color.b
-				&& tex_cache[i].color.a == color.a
-				&& strcmp(tex_cache[i].text, text) == 0) {
+			&& tex_cache[i].color.r == color.r
+			&& tex_cache[i].color.g == color.g
+			&& tex_cache[i].color.b == color.b
+			&& tex_cache[i].color.a == color.a
+			&& tex_cache[i].hash == h
+			&& strcmp(tex_cache[i].text, text) == 0) {
 			tex_cache[i].lru_counter = ++tex_lru_counter;
 			is_hit = 1;
 			min_lru_idx = i;
@@ -199,37 +206,26 @@ static gui_tex_cache_entry_t* find_tex_cache(const char* text, TTF_Font* font,
 			min_lru_idx = i;
 		}
 	}
-
-	int target_idx =
-			is_hit ?
-					min_lru_idx :
-					(first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
-
+	int target_idx = is_hit ? min_lru_idx : (first_empty_idx != -1 ? first_empty_idx : min_lru_idx);
 #if GUI_SDL2_TEXT_CACHE_STATS
 	if (is_hit) tex_cache_hits_sec++; else tex_cache_misses_sec++;
 	print_cache_stats();
 #endif
-
-	// ХИТ: текстура уже готова — возвращаем БЕЗ рендера и БЕЗ destroy
 	if (is_hit)
 		return &tex_cache[target_idx];
-
-	// ПРОМАХ: освобождаем вытесняемую текстуру (если ячейка была занята) и рендерим заново
 	gui_tex_cache_entry_t* entry = &tex_cache[target_idx];
 	if (entry->valid && entry->texture)
 		SDL_DestroyTexture(entry->texture);
-
 	strncpy(entry->text, text, TEXT_ARRAY_SIZE - 1);
 	entry->text[TEXT_ARRAY_SIZE - 1] = '\0';
 	entry->font = font;
 	entry->color = color;
+	entry->hash = h;
 	entry->valid = 1;
 	entry->lru_counter = ++tex_lru_counter;
-
 	SDL_Surface* surf = TTF_RenderText_Blended(font, text, color);
 	if (surf) {
-		entry->texture = SDL_CreateTextureFromSurface(sdl2_get_renderer(),
-				surf);
+		entry->texture = SDL_CreateTextureFromSurface(sdl2_get_renderer(), 	surf);
 		if (entry->texture)
 			SDL_SetTextureBlendMode(entry->texture, SDL_BLENDMODE_BLEND);
 		entry->w = surf->w;
@@ -245,94 +241,91 @@ static gui_tex_cache_entry_t* find_tex_cache(const char* text, TTF_Font* font,
 
 void gui_sdl2_get_text_size(const char* text, TTF_Font* font, int* w, int* h)
 {
-    if (!text || !font) { if (w) *w = 0; if (h) *h = 0; return; }
-    gui_size_cache_entry_t* entry = find_size_cache(text, font);
-    if (w) *w = entry->w;
-    if (h) *h = entry->h;
+	if (!text || !font) {
+		if (w) *w = 0;
+		if (h) *h = 0;
+		return;
+	}
+
+	gui_size_cache_entry_t* entry = find_size_cache(text, font);
+	if (w) *w = entry->w;
+	if (h) *h = entry->h;
 }
 
 void gui_sdl2_draw_text(const char* text, int x, int y, TTF_Font* font, gui_color_t color)
 {
-    if (!text || !font) return;
-
-    SDL_Color c;
-    c.r = (color >> 16) & 0xFF;
-    c.g = (color >> 8) & 0xFF;
-    c.b = (color >> 0) & 0xFF;
-    c.a = (color >> 24) & 0xFF;
-
-    gui_tex_cache_entry_t* entry = find_tex_cache(text, font, c);
-    if (entry->texture) {
-        SDL_Rect dst = {x, y, entry->w, entry->h};
-        SDL_RenderCopy(sdl2_get_renderer(), entry->texture, NULL, &dst);
-    }
+	if (!text || !font) return;
+	SDL_Color c;
+	c.r = (color >> 16) & 0xFF;
+	c.g = (color >> 8) & 0xFF;
+	c.b = (color >> 0) & 0xFF;
+	c.a = (color >> 24) & 0xFF;
+	gui_tex_cache_entry_t* entry = find_tex_cache(text, font, c);
+	if (entry->texture) {
+		SDL_Rect dst = {x, y, entry->w, entry->h};
+		SDL_RenderCopy(sdl2_get_renderer(), entry->texture, NULL, &dst);
+	}
 }
 
 void gui_sdl2_invalidate_font_cache(TTF_Font* font)
 {
-    if (!font) return;
-
-    // Инвалидируем записи кэша размеров
-    for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
-        if (size_cache[i].valid && size_cache[i].font == font) {
-            size_cache[i].valid = 0;
-            size_cache[i].text[0] = '\0';
-            size_cache[i].w = 0;
-            size_cache[i].h = 0;
-        }
-    }
-
-    // Инвалидируем записи кэша текстур
-    for (int i = 0; i < TEX_CACHE_SIZE; i++) {
-        if (tex_cache[i].valid && tex_cache[i].font == font) {
-            if (tex_cache[i].texture) {
-                SDL_DestroyTexture(tex_cache[i].texture);
-                tex_cache[i].texture = NULL;
-            }
-            tex_cache[i].valid = 0;
-            tex_cache[i].text[0] = '\0';
-            tex_cache[i].w = 0;
-            tex_cache[i].h = 0;
-        }
-    }
+	if (!font) return;
+	for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
+		if (size_cache[i].valid && size_cache[i].font == font) {
+			size_cache[i].valid = 0;
+			size_cache[i].text[0] = '\0';
+			size_cache[i].w = 0;
+			size_cache[i].h = 0;
+		}
+	}
+	for (int i = 0; i < TEX_CACHE_SIZE; i++) {
+		if (tex_cache[i].valid && tex_cache[i].font == font) {
+			if (tex_cache[i].texture) {
+				SDL_DestroyTexture(tex_cache[i].texture);
+				tex_cache[i].texture = NULL;
+			}
+			tex_cache[i].valid = 0;
+			tex_cache[i].text[0] = '\0';
+			tex_cache[i].w = 0;
+			tex_cache[i].h = 0;
+		}
+	}
 }
 
 void gui_sdl2_invalidate_text(const char* text, TTF_Font* font)
 {
-    if (!text || !font) return;
-
-    // Удалить из кэша размеров
-    for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
-        if (size_cache[i].valid &&
-            size_cache[i].font == font &&
-            strcmp(size_cache[i].text, text) == 0) {
-            size_cache[i].valid = 0;
-            size_cache[i].text[0] = '\0';
-            size_cache[i].w = 0;
-            size_cache[i].h = 0;
-            size_cache[i].lru_counter = 0;
-        }
-    }
-
-    // Удалить из кэша текстур
-    for (int i = 0; i < TEX_CACHE_SIZE; i++) {
-        if (tex_cache[i].valid &&
-            tex_cache[i].font == font &&
-            strcmp(tex_cache[i].text, text) == 0) {
-            if (tex_cache[i].texture) {
-                SDL_DestroyTexture(tex_cache[i].texture);
-                tex_cache[i].texture = NULL;
-            }
-            tex_cache[i].valid = 0;
-            tex_cache[i].text[0] = '\0';
-            tex_cache[i].w = 0;
-            tex_cache[i].h = 0;
-            tex_cache[i].lru_counter = 0;
-        }
-    }
+	if (!text || !font) return;
+	uint32_t h = text_hash(text);
+	for (int i = 0; i < SIZE_CACHE_SIZE; i++) {
+		if (size_cache[i].valid &&
+			size_cache[i].font == font &&
+			size_cache[i].hash == h &&
+			strcmp(size_cache[i].text, text) == 0) {
+			size_cache[i].valid = 0;
+			size_cache[i].text[0] = '\0';
+			size_cache[i].w = 0;
+			size_cache[i].h = 0;
+			size_cache[i].lru_counter = 0;
+		}
+	}
+	for (int i = 0; i < TEX_CACHE_SIZE; i++) {
+		if (tex_cache[i].valid &&
+			tex_cache[i].font == font &&
+			tex_cache[i].hash == h &&
+			strcmp(tex_cache[i].text, text) == 0) {
+			if (tex_cache[i].texture) {
+				SDL_DestroyTexture(tex_cache[i].texture);
+				tex_cache[i].texture = NULL;
+			}
+			tex_cache[i].valid = 0;
+			tex_cache[i].text[0] = '\0';
+			tex_cache[i].w = 0;
+			tex_cache[i].h = 0;
+			tex_cache[i].lru_counter = 0;
+		}
+	}
 }
 
-//void gui_sdl2_draw_text(const char* text, int x, int y, TTF_Font* font, gui_color_t color)
 void gui_sdl2_print(const char* text, int x, int y, TTF_Font* font, gui_color_t color)
 {
 	window_t * win = get_win(get_current_drawing_window());
@@ -340,136 +333,118 @@ void gui_sdl2_print(const char* text, int x, int y, TTF_Font* font, gui_color_t 
 }
 
 /* =====================================================================
-   ЦВЕТОВАЯ РАЗМЕТКА ТЕКСТА
-   Формат маркеров:
-     /csRRGGBB  — установить цвет (ровно 6 hex-цифр RGB, альфа всегда 0xFF)
-     /cd        — сброс к цвету по умолчанию (default_color)
-     /ce        — игнорируется (совместимость с внешними форматами)
-   Всё остальное между маркерами — обычный текст, отрисовывается текущим цветом.
-   ===================================================================== */
-
+ЦВЕТОВАЯ РАЗМЕТКА ТЕКСТА
+===================================================================== */
 typedef void (*colored_seg_cb)(const char *seg, int len,
-                               gui_color_t color, void *ctx);
+	gui_color_t color, void *ctx);
 
-/* Проверяет, что p[0..5] — валидные hex-цифры */
 static int is_hex6(const char *p)
 {
-    for (int i = 0; i < 6; i++)
-        if (!isxdigit((unsigned char)p[i])) return 0;
-    return 1;
+	for (int i = 0; i < 6; i++)
+		if (!isxdigit((unsigned char)p[i])) return 0;
+	return 1;
 }
 
-/* Возвращает 1, если в позиции p стоит любой из маркеров /cs /cd /ce */
 static int is_marker(const char *p)
 {
-    return (p[0] == '/' && p[1] == 'c' &&
-           (p[2] == 's' || p[2] == 'd' || p[2] == 'e'));
+	return (p[0] == '/' && p[1] == 'c' &&
+		(p[2] == 's' || p[2] == 'd' || p[2] == 'e'));
 }
 
-/* Универсальный парсер: разбивает строку на сегменты (текст, цвет)
-   и вызывает cb для каждого текстового сегмента. */
 static void parse_colored_text(const char *text, gui_color_t default_color,
-                               colored_seg_cb cb, void *ctx)
+	colored_seg_cb cb, void *ctx)
 {
-    gui_color_t color = default_color;
-    const char *p = text;
-
-    while (*p)
-    {
-        /* /csRRGGBB — установка цвета, читаем РОВНО 6 hex-цифр */
-        if (p[0] == '/' && p[1] == 'c' && p[2] == 's' && is_hex6(p + 3))
-        {
-            char hex[7] = { p[3], p[4], p[5], p[6], p[7], p[8], '\0' };
-            uint32_t rgb = (uint32_t)strtoul(hex, NULL, 16);
-            color = 0xFF000000u | rgb;
-            p += 9;
-        }
-        /* /cd — сброс к цвету по умолчанию */
-        else if (p[0] == '/' && p[1] == 'c' && p[2] == 'd')
-        {
-            color = default_color;
-            p += 3;
-        }
-        /* /ce — игнорируется (не сбрасывает цвет) */
-        else if (p[0] == '/' && p[1] == 'c' && p[2] == 'e')
-        {
-            p += 3;
-        }
-        /* обычный текст до следующего маркера или конца строки */
-        else
-        {
-            const char *start = p;
-            while (*p && !is_marker(p))
-                p++;
-            if (p > start)
-                cb(start, (int)(p - start), color, ctx);
-        }
-    }
+	gui_color_t color = default_color;
+	const char *p = text;
+	while (*p)
+	{
+		if (p[0] == '/' && p[1] == 'c' && p[2] == 's' && is_hex6(p + 3))
+		{
+			char hex[7] = { p[3], p[4], p[5], p[6], p[7], p[8], '\0' };
+			uint32_t rgb = (uint32_t)strtoul(hex, NULL, 16);
+			color = 0xFF000000u | rgb;
+			p += 9;
+		}
+		else if (p[0] == '/' && p[1] == 'c' && p[2] == 'd')
+		{
+			color = default_color;
+			p += 3;
+		}
+		else if (p[0] == '/' && p[1] == 'c' && p[2] == 'e')
+		{
+			p += 3;
+		}
+		else
+		{
+			const char *start = p;
+			while (*p && !is_marker(p))
+				p++;
+			if (p > start)
+				cb(start, (int)(p - start), color, ctx);
+		}
+	}
 }
 
-/* ---- callback для измерения ширины ---- */
 typedef struct { TTF_Font *font; int total_w; int max_h; } size_ctx_t;
 
 static void size_cb(const char *seg, int len, gui_color_t color, void *ctx)
 {
-    (void)color;
-    size_ctx_t *sc = (size_ctx_t *)ctx;
-    char tmp[TEXT_ARRAY_SIZE];
-    int n = len < TEXT_ARRAY_SIZE - 1 ? len : TEXT_ARRAY_SIZE - 1;
-    memcpy(tmp, seg, n);
-    tmp[n] = '\0';
-    int w = 0, h = 0;
-    gui_sdl2_get_text_size(tmp, sc->font, &w, &h);
-    sc->total_w += w;
-    if (h > sc->max_h) sc->max_h = h;
+	(void)color;
+	size_ctx_t *sc = (size_ctx_t *)ctx;
+	char tmp[TEXT_ARRAY_SIZE];
+	int n = len < TEXT_ARRAY_SIZE - 1 ? len : TEXT_ARRAY_SIZE - 1;
+	memcpy(tmp, seg, n);
+	tmp[n] = '\0';
+	int w = 0, h = 0;
+	gui_sdl2_get_text_size(tmp, sc->font, &w, &h);
+	sc->total_w += w;
+	if (h > sc->max_h) sc->max_h = h;
 }
 
 void gui_sdl2_get_text_size_colored(const char *text, TTF_Font *font,
-                                    int *w, int *h)
+	int *w, int *h)
 {
-    if (!text || !font) { if (w) *w = 0; if (h) *h = 0; return; }
-    if (!gui_sdl2_has_color_markers(text)) {
-        gui_sdl2_get_text_size(text, font, w, h);
-        return;
-    }
-    size_ctx_t sc = { font, 0, 0 };
-    parse_colored_text(text, 0, size_cb, &sc);
-    if (w) *w = sc.total_w;
-    if (h) *h = sc.max_h;
+	if (!text || !font) { if (w) *w = 0; if (h) *h = 0; return; }
+	if (!gui_sdl2_has_color_markers(text)) {
+		gui_sdl2_get_text_size(text, font, w, h);
+		return;
+	}
+	size_ctx_t sc = { font, 0, 0 };
+	parse_colored_text(text, 0, size_cb, &sc);
+	if (w) *w = sc.total_w;
+	if (h) *h = sc.max_h;
 }
 
-/* ---- callback для отрисовки ---- */
 typedef struct { TTF_Font *font; int x, y; } draw_ctx_t;
 
 static void draw_cb(const char *seg, int len, gui_color_t color, void *ctx)
 {
-    draw_ctx_t *dc = (draw_ctx_t *)ctx;
-    char tmp[TEXT_ARRAY_SIZE];
-    int n = len < TEXT_ARRAY_SIZE - 1 ? len : TEXT_ARRAY_SIZE - 1;
-    memcpy(tmp, seg, n);
-    tmp[n] = '\0';
-    int w = 0, h = 0;
-    gui_sdl2_get_text_size(tmp, dc->font, &w, &h);
-    gui_sdl2_draw_text(tmp, dc->x, dc->y, dc->font, color);
-    dc->x += w;
+	draw_ctx_t *dc = (draw_ctx_t *)ctx;
+	char tmp[TEXT_ARRAY_SIZE];
+	int n = len < TEXT_ARRAY_SIZE - 1 ? len : TEXT_ARRAY_SIZE - 1;
+	memcpy(tmp, seg, n);
+	tmp[n] = '\0';
+	int w = 0, h = 0;
+	gui_sdl2_get_text_size(tmp, dc->font, &w, &h);
+	gui_sdl2_draw_text(tmp, dc->x, dc->y, dc->font, color);
+	dc->x += w;
 }
 
 void gui_sdl2_draw_text_colored(const char *text, int x, int y,
-                                TTF_Font *font, gui_color_t default_color)
+	TTF_Font *font, gui_color_t default_color)
 {
-    if (!text || !font) return;
-    if (!gui_sdl2_has_color_markers(text)) {
-        gui_sdl2_draw_text(text, x, y, font, default_color);
-        return;
-    }
-    draw_ctx_t dc = { font, x, y };
-    parse_colored_text(text, default_color, draw_cb, &dc);
+	if (!text || !font) return;
+	if (!gui_sdl2_has_color_markers(text)) {
+		gui_sdl2_draw_text(text, x, y, font, default_color);
+		return;
+	}
+	draw_ctx_t dc = { font, x, y };
+	parse_colored_text(text, default_color, draw_cb, &dc);
 }
 
 int gui_sdl2_has_color_markers(const char *text)
 {
-    if (!text) return 0;
-    return (strstr(text, "/c") != NULL) ? 1 : 0;
+	if (!text) return 0;
+	return (strstr(text, "/c") != NULL) ? 1 : 0;
 }
-
 #endif /* SIMPLE_GUI */
