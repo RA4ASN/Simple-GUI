@@ -329,7 +329,7 @@ void textfield_add_string_old(text_field_t * tf, const char * str, gui_color_t c
 {
 	GUI_ASSERT(tf != NULL);
 
-	tf_entry_t * rec = &  tf->string[tf->index];
+	tf_entry_t * rec = & tf->string[tf->index];
 	strncpy(rec->text, str, TEXT_ARRAY_SIZE - 1);
 	rec->color_line = color;
 	tf->index ++;
@@ -367,13 +367,15 @@ void draw_textfield(text_field_t * tf)
     int j = tf->index - 1;
     int line_h = TTF_FontHeight(tf->font);
 
+//    __gui_draw_rect(x, y, tf->w, tf->h, GUI_COLOR_WHITE, 0);
+
     for (uint8_t i = 0; i < tf->h_str; i ++, j --)
     {
         uint8_t pos = tf->direction ? i : (tf->h_str - i - 1);
         j = j < 0 ? (tf->h_str - 1) : j;
 
-        gui_sdl2_draw_text(tf->string[j].text, x, y + line_h * pos, tf->font, tf->string[j].color_line);
-
+        if (strlen(tf->string[j].text))
+			gui_sdl2_draw_text(tf->string[j].text, x, y + line_h * pos, tf->font, tf->string[j].color_line);
     }
 }
 
@@ -506,11 +508,7 @@ static void save_arrange_area(window_t * win, uint16_t x, uint16_t y, uint16_t w
 // TYPE_TEXT_FIELD (tf_):    uint32_t w_sim, uint32_t h_str, uint32_t direction, void * font
 //                           w_sim     - ширина поля в символах
 //                           h_str     - число строк поля
-//                           direction - направление прокрутки (значения tf_direction_t: UP/DOWN)
-//                           font      - СЧИТЫВАЕТСЯ из varargs, но в SDL2-сборке ИГНОРИРУЕТСЯ
-//                                       (всегда используется общий моноширинный шрифт меток).
-//                                       Передавать ОБЯЗАТЕЛЬНО (например NULL), иначе va_arg
-//                                       прочитает непереданный аргумент = неопределённое поведение.
+//                           direction - направление прокрутки (значения tf_direction_t: UP/DOWN).
 //
 // TYPE_TOUCH_AREA (ta_):    int x, int y, int w, int h, int is_trackable
 //                           x, y, w, h   - геометрия области в координатах окна
@@ -666,8 +664,6 @@ uint8_t gui_obj_create(const char * name, ...)
 		tf->w_sim = va_arg(arg, uint32_t);
 		tf->h_str = va_arg(arg, uint32_t);
 		tf->direction = (tf_direction_t) va_arg(arg, uint32_t);
-
-		void * passed_font = va_arg(arg, void *);	// Убрать
 		tf->font = gui_sdl2_get_label_font(); 		// Переиспользуем моноширинный шрифт меток
 
 		strncpy(tf->name, obj_name, NAME_ARRAY_SIZE);
@@ -679,6 +675,7 @@ uint8_t gui_obj_create(const char * name, ...)
 		GUI_MEM_ASSERT(tf->string);
 		tf->index = 0;
 		textfield_update_size(tf);
+
 		idx = win->tf_count;
 		win->tf_count ++;
 		break;
