@@ -1,22 +1,14 @@
 // Simple GUI от RA4ASN
 #include "gui_user_include.h"
-
-#if SIMPLE_GUI && GUI_SDL2_INPUT
-
-#include "gui_sdl2_input.h"
-#include "gui_system.h"      // gui_get_max_w / gui_get_max_h
-#include <SDL2/SDL.h>
-#include <stdio.h>
-#include <string.h>
-#include <dirent.h>
-#include <linux/input.h>
+#if SIMPLE_GUI && GUI_SDL2_INPUT && ! GUI_USE_PORT
+#include "../gui_includes.h"
 
 static struct {
-    int      touching;        // 1 = палец на экране прямо сейчас
-    int      have_finger;     // 1 = активен тач-палец (ставится в DOWN, сбрасывается в UP)
-    SDL_FingerID finger_id;   // id последнего DOWN
+    int      touching;
+    int      have_finger;
+    SDL_FingerID finger_id;
     int      pressed_this_poll;
-    uint16_t x, y;            // текущие координаты в системе GUI
+    uint16_t x, y;
 } inp;
 
 /* координаты мыши (window pixels) -> логические координаты GUI */
@@ -44,29 +36,27 @@ void gui_sdl2_input_init(void)
     SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
 }
 
-void gui_sdl2_input_poll(void)
+int gui_sdl2_input_get(uint16_t *x, uint16_t *y)
 {
     inp.pressed_this_poll = 0;
-
     SDL_Event ev;
+
     while (SDL_PollEvent(&ev))
     {
         switch (ev.type)
         {
         case SDL_FINGERDOWN:
-        	if (inp.have_finger) break;
+            if (inp.have_finger) break;
             inp.have_finger     = 1;
             inp.finger_id       = ev.tfinger.fingerId;
             inp.touching        = 1;
             inp.pressed_this_poll = 1;
             set_from_touch(ev.tfinger.x, ev.tfinger.y);
-
             break;
 
         case SDL_FINGERMOTION:
             set_from_touch(ev.tfinger.x, ev.tfinger.y);
             if (inp.have_finger) inp.touching = 1;
-
             break;
 
         case SDL_FINGERUP:
@@ -80,10 +70,7 @@ void gui_sdl2_input_poll(void)
             break;
         }
     }
-}
 
-int gui_sdl2_input_get(uint16_t *x, uint16_t *y)
-{
     if (x) *x = inp.x;
     if (y) *y = inp.y;
     int active = inp.touching || inp.pressed_this_poll;
@@ -91,4 +78,4 @@ int gui_sdl2_input_get(uint16_t *x, uint16_t *y)
     return active;
 }
 
-#endif /* SIMPLE_GUI && GUI_SDL2_INPUT */
+#endif /* SIMPLE_GUI && GUI_SDL2_INPUT && ! GUI_USE_PORT */

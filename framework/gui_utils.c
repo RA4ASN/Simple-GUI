@@ -1,9 +1,9 @@
 // Simple GUI от RA4ASN
-
 #include "gui_utils.h"
+#if SIMPLE_GUI
 
 /* Безопасное сравнение строк */
-int safe_strcmp(const char * s1, const char * s2)
+int safe_strcmp(const char *s1, const char *s2)
 {
     if (s1 == NULL && s2 == NULL)
         return 0;
@@ -45,7 +45,7 @@ int is_valid_datetime(int year, int month, int day, int hour, int minute, int se
 }
 
 /* Удаление пробелов в конце строки */
-void remove_end_line_spaces(char * str)
+void remove_end_line_spaces(char *str)
 {
 	size_t i = strlen(str);
 	if (i == 0)
@@ -60,7 +60,7 @@ void remove_end_line_spaces(char * str)
 }
 
 /* Удаление пробелов в начале строки */
-const char * remove_start_line_spaces(const char * str)
+const char * remove_start_line_spaces(const char *str)
 {
 	size_t len = strlen(str);
 	uint8_t i = 0;
@@ -106,3 +106,5 @@ int snormalize(int raw, int rawmin, int rawmax, int range)
 	}
 	return 0;
 }
+
+#endif /* SIMPLE_GUI */

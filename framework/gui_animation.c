@@ -17,7 +17,7 @@ static int32_t apply_easing(gui_easing_t e, uint32_t t100)
 	}
 }
 
-void gui_anim_set(gui_anim_t * a, int32_t value)
+void gui_anim_set(gui_anim_t *a, int32_t value)
 {
 	a->from = value;
 	a->to = value;
@@ -26,7 +26,7 @@ void gui_anim_set(gui_anim_t * a, int32_t value)
 	a->active = 0;
 }
 
-void gui_anim_start(gui_anim_t * a, int32_t to, uint16_t duration, gui_easing_t easing)
+void gui_anim_start(gui_anim_t *a, int32_t to, uint16_t duration, gui_easing_t easing)
 {
 	if (!duration || a->value == to)	// анимация не нужна
 	{
@@ -39,15 +39,15 @@ void gui_anim_start(gui_anim_t * a, int32_t to, uint16_t duration, gui_easing_t 
 	a->to = to;
 	a->duration = duration;
 	a->easing = easing;
-	a->start_tick = SDL_GetTicks();
+	a->start_tick = __gui_get_ticks();
 	a->active = 1;
 }
 
-uint8_t gui_anim_update(gui_anim_t * a)
+uint8_t gui_anim_update(gui_anim_t *a)
 {
 	if (!a->active) return 0;
 
-	const uint32_t elapsed = SDL_GetTicks() - a->start_tick;
+	const uint32_t elapsed = __gui_get_ticks() - a->start_tick;
 
 	if (elapsed >= a->duration)
 	{

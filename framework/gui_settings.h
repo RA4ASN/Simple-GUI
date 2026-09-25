@@ -1,11 +1,11 @@
 // Simple GUI от RA4ASN
-
 #ifndef _gui_settings_h
 #define _gui_settings_h
 
 #include "gui_user_include.h"
-
 #if SIMPLE_GUI
+
+#define GUI_SDL2_TEXT_CACHE		1
 
 #define GUI_ETALON_W			800
 #define GUI_ETALON_H			480

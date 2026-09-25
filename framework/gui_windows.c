@@ -1,9 +1,6 @@
 // Simple GUI от RA4ASN
-
 #include "gui_user_include.h"
-
 #if SIMPLE_GUI
-
 #include "gui_includes.h"
 
 void gui_user_actions_after_close_window(void);
@@ -19,7 +16,7 @@ static window_t windows[] = {
 
 uint8_t is_win_init(void)
 {
-	window_t * win = get_win(get_parent_window());
+	window_t *win = get_win(get_parent_window());
 	uint8_t s = win->first_call;
 
 	if (s)
@@ -31,7 +28,7 @@ uint8_t is_win_init(void)
 // only for gui_main_process()
 uint8_t is_winmain_init(void)
 {
-	window_t * win = get_win(WINDOW_MAIN);
+	window_t *win = get_win(WINDOW_MAIN);
 	uint8_t s = win->first_call;
 
 	if (s)
@@ -41,17 +38,17 @@ uint8_t is_winmain_init(void)
 }
 
 /* Возврат ссылки на окно */
-window_t * get_win(uint8_t window_id)
+window_t *get_win(uint8_t window_id)
 {
 	if (window_id == NO_PARENT_WINDOW)	//	костыль
-		return & windows[0];
+		return &windows[0];
 
 	GUI_ASSERT(window_id < WINDOWS_COUNT);
-	return & windows[window_id];
+	return &windows[window_id];
 }
 
 /* Открыть окно */
-void open_window(window_t * win)
+void open_window(window_t *win)
 {
 	uint8_t pwin = get_parent_window();
 
@@ -64,18 +61,37 @@ void open_window(window_t * win)
 	win->is_moving = 0;
 	win->title_align = ALIGNMENT_LEFT;
 	win->ca_current = NULL;
+	win->arrange_area_valid = 0;
 	set_parent_window(win->window_id);
 }
 
 /* Освободить выделенную память в куче и обнулить счетчики элементов окна */
-static void free_win_ptr (window_t * win)
+static void free_win_ptr (window_t *win)
 {
+	if (win->tf_count)
+	{
+		for (uint8_t i = 0; i < win->tf_count; i++)
+			free(win->tf_ptr[i].string);
+	}
+
+	if (win->lh_count)
+	{
+		for (uint8_t i = 0; i < win->lh_count; i++)
+		{
+			label_t *lh = &win->lh_ptr[i];
+			if (lh->font_owned) gui_close_font(lh->font);
+		}
+	}
+
+	clean_wm_queue(win);
+
 	free(win->bh_ptr);
 	free(win->lh_ptr);
 	free(win->sh_ptr);
 	free(win->ta_ptr);
 	free(win->tf_ptr);
 	free(win->ca_ptr);
+	free(win->sw_ptr);
 
 	win->bh_count = 0;
 	win->lh_count = 0;
@@ -95,14 +111,24 @@ static void free_win_ptr (window_t * win)
 //	GUI_DEBUG_PRINT("free: %d %s\n", win->window_id, win->title);
 }
 
-/* Установка признака видимости окна */
-void close_window(uint8_t parent_action) // 0 - не открывать parent window, 1 - открыть
+/* Закрытие активного окна:
+   - сброс признака видимости (state = NON_VISIBLE);
+   - постановка сообщения WM_MESSAGE_CLOSE в очередь окна и вызов onVisibleProcess;
+   - освобождение динамически выделенной памяти элементов окна (free_win_ptr);
+   - сброс parent window в NO_PARENT_WINDOW;
+   - опциональное открытие родительского окна (если оно существует и
+     параметр parent_action == OPEN_PARENT_WINDOW (1));
+   - вызов пользовательского обработчика gui_user_actions_after_close_window().
+   Параметр:
+   parent_action - 0 (DONT_OPEN_PARENT_WINDOW) - не открывать родительское окно,
+                   1 (OPEN_PARENT_WINDOW)      - открыть родительское окно после закрытия */
+void close_window(uint8_t parent_action)
 {
 	uint8_t pwin = get_parent_window();
 
 	if(pwin != NO_PARENT_WINDOW)
 	{
-		window_t * win = get_win(pwin);
+		window_t *win = get_win(pwin);
 		win->state = NON_VISIBLE;
 
 		if (put_to_wm_queue(win, WM_MESSAGE_CLOSE))
@@ -131,11 +157,11 @@ void close_all_windows(void)
 /* Разрешить перетаскивание окна */
 void enable_window_move(void)
 {
-	window_t * win = get_win(get_parent_window());
+	window_t *win = get_win(get_parent_window());
 	win->is_moving = 1;
 }
 
-void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay)
+void move_window(window_t *win, int_fast16_t ax, int_fast16_t ay)
 {
 	GUI_ASSERT(win != NULL);
 
@@ -162,23 +188,33 @@ void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay)
 // WINDOW_POSITION_AUTO:              (нет вариабельных аргументов; размеры окна выводятся
 //                                     автоматически из габаритов созданных в нём объектов)
 //
-// Примечание: MANUAL_POSITION дополнительно использует xmax/ymax, вычисленные по объектам
-// окна (как в AUTO), но левый верхний угол берёт из varargs; FULLSCREEN игнорирует и то, и другое.
+// Примечание:
+// - MANUAL_POSITION: перед вычислением позиции читаются координаты левого верхнего
+//   угла (x_start, y_start) из varargs; xmax/ymax вычисляются по объектам окна
+//   (общий код с AUTO) и используются для расчёта ширины/высоты окна.
+// - FULLSCREEN: varargs не читаются; размеры окна устанавливаются на весь экран
+//   (за вычетом footer), вычисленные по объектам xmax/ymax не используются
+//   (но формально вычисляются в общем блоке кода).
+// - AUTO: varargs не читаются; размеры и позиция окна выводятся автоматически
+//   из габаритов созданных в нём объектов и режима выравнивания окна.
 void calculate_window_position(uint8_t mode, ...)
 {
-	window_t * win = get_win(get_parent_window());
+	window_t *win = get_win(get_parent_window());
+	GUI_ASSERT(win != NULL);
+
 	uint16_t xmax = 0, ymax = 0, shift_x, shift_y, x_start, y_start;
 	uint16_t align_left_x = gui_sizes.max_w / 4;
 	uint16_t align_center_x = gui_sizes.max_w / 2;
 	uint16_t align_right_x = align_left_x + align_center_x;
 	uint16_t align_y = gui_sizes.max_h / 2 - gui_sizes.footer_height / 2;
 	uint16_t title_length = 0;
+
 	if (strcmp(win->title, "")) {
 		int tw = 0, th = 0;
-		gui_sdl2_get_text_size(win->title, gui_sdl2_get_window_title_font(), &tw, &th);
+		gui_get_text_sizes(win->title, gui_get_window_title_font(), &tw, &th);
 		title_length = (uint16_t)tw;
 	}
-	GUI_ASSERT(win != NULL);
+
 	win->size_mode = mode;
 
 	/* shift вычисляем заранее — нужен для canvas в xmax/ymax */
@@ -212,7 +248,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->bh_count; i++)
 			{
-				const button_t * bh = & win->bh_ptr[i];
+				const button_t *bh = &win->bh_ptr[i];
 				xmax = (xmax > bh->x1 + bh->w) ? xmax : (bh->x1 + bh->w);
 				ymax = (ymax > bh->y1 + bh->h) ? ymax : (bh->y1 + bh->h);
 				GUI_ASSERT(xmax < gui_sizes.max_w);
@@ -223,7 +259,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->lh_count; i++)
 			{
-				const label_t * lh = & win->lh_ptr[i];
+				const label_t *lh = &win->lh_ptr[i];
 				xmax = (xmax > lh->x + get_label_width(lh)) ? xmax : (lh->x + get_label_width(lh));
 				ymax = (ymax > lh->y + get_label_height(lh)) ? ymax : (lh->y + get_label_height(lh));
 				GUI_ASSERT(xmax < gui_sizes.max_w);
@@ -234,7 +270,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->tf_count; i++)
 			{
-				const text_field_t * tf = & win->tf_ptr[i];
+				const text_field_t *tf = &win->tf_ptr[i];
 				xmax = (xmax > tf->x1 + tf->w) ? xmax : (tf->x1 + tf->w);
 				ymax = (ymax > tf->y1 + tf->h) ? ymax : (tf->y1 + tf->h);
 				GUI_ASSERT(xmax < gui_sizes.max_w);
@@ -245,7 +281,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->sh_count; i++)
 			{
-				const slider_t * sh = & win->sh_ptr[i];
+				const slider_t *sh = &win->sh_ptr[i];
 				if (sh->orientation)
 				{
 					xmax = (xmax > sh->x + sh->size + gui_sizes.sliders_w) ? xmax : (sh->x + sh->size + gui_sizes.sliders_w);
@@ -264,7 +300,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->sw_count; i++)
 			{
-				const switch_t * sw = & win->sw_ptr[i];
+				const switch_t *sw = &win->sw_ptr[i];
 				xmax = (xmax > sw->x + sw->w) ? xmax : (sw->x + sw->w);
 				ymax = (ymax > sw->y + sw->h) ? ymax : (sw->y + sw->h);
 				GUI_ASSERT(xmax < gui_sizes.max_w);
@@ -277,7 +313,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->ca_count; i++)
 			{
-				const canvas_t * ca = & win->ca_ptr[i];
+				const canvas_t *ca = &win->ca_ptr[i];
 				xmax = (xmax > ca->x + shift_x + ca->w) ? xmax : (ca->x + shift_x + ca->w);
 				ymax = (ymax > ca->y + shift_y + ca->h) ? ymax : (ca->y + shift_y + ca->h);
 				GUI_ASSERT(xmax < gui_sizes.max_w);
@@ -296,7 +332,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->bh_count; i++)
 			{
-				button_t * bh = & win->bh_ptr[i];
+				button_t *bh = &win->bh_ptr[i];
 				bh->x1 += shift_x;
 				bh->y1 += shift_y;
 				GUI_ASSERT(bh->x1 + bh->w < gui_sizes.max_w);
@@ -308,7 +344,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->lh_count; i++)
 			{
-				label_t * lh = & win->lh_ptr[i];
+				label_t *lh = &win->lh_ptr[i];
 				lh->x += shift_x;
 				lh->y += shift_y;
 				GUI_ASSERT(lh->x + get_label_width(lh) < gui_sizes.max_w);
@@ -320,7 +356,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->tf_count; i++)
 			{
-				text_field_t * tf = & win->tf_ptr[i];
+				text_field_t *tf = &win->tf_ptr[i];
 				tf->x1 += shift_x;
 				tf->y1 += shift_y;
 				GUI_ASSERT(tf->x1 + tf->w < gui_sizes.max_w);
@@ -332,7 +368,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->ta_count; i++)
 			{
-				touch_area_t * ta = & win->ta_ptr[i];
+				touch_area_t *ta = &win->ta_ptr[i];
 				ta->x1 += shift_x;
 				ta->y1 += shift_y;
 				GUI_ASSERT(ta->x1 + ta->w < gui_sizes.max_w);
@@ -344,7 +380,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->sh_count; i++)
 			{
-				slider_t * sh = & win->sh_ptr[i];
+				slider_t *sh = &win->sh_ptr[i];
 				sh->x += shift_x;
 				sh->y += shift_y;
 				GUI_ASSERT(sh->x < gui_sizes.max_w);
@@ -355,7 +391,7 @@ void calculate_window_position(uint8_t mode, ...)
 		{
 			for (uint8_t i = 0; i < win->sw_count; i++)
 			{
-				switch_t * sw = & win->sw_ptr[i];
+				switch_t *sw = &win->sw_ptr[i];
 				sw->x += shift_x;
 				sw->y += shift_y;
 				GUI_ASSERT(sw->x + sw->w < gui_sizes.max_w);
@@ -372,8 +408,7 @@ void calculate_window_position(uint8_t mode, ...)
 
 	if (mode == WINDOW_POSITION_FULLSCREEN)
 	{
-		const window_t * win_main = get_win(WINDOW_MAIN);
-		const uint8_t h = win_main->bh_ptr[0].h;
+		const window_t *win_main = get_win(WINDOW_MAIN);
 
 		win->x1 = 0;
 		win->y1 = 0;
@@ -442,15 +477,15 @@ void calculate_window_position(uint8_t mode, ...)
 	if (win->is_moving)
 	{
 		gui_obj_create("ta_winmove", 0, 0, win->w - gui_sizes.window_close_button_size, gui_sizes.window_title_height, 1);
-		touch_area_t * tm = (touch_area_t *) find_gui_obj(TYPE_TOUCH_AREA, win, "ta_winmove");
+		touch_area_t *tm = (touch_area_t *) find_gui_obj(TYPE_TOUCH_AREA, win, "ta_winmove");
 		tm->visible = VISIBLE;
 		tm->state = CANCELLED;
 	}
 
 	for (uint8_t i = 0; i < win->bh_count; i++)
 	{
-		button_t * bh = & win->bh_ptr[i];
-		if (bh->is_long_press && bh->is_repeating)
+		button_t *bh = &win->bh_ptr[i];
+		if (bh->is_long_press &&bh->is_repeating)
 		{
 			GUI_DEBUG_PRINT("ERROR: invalid combination of properties 'is_long_press' and 'is_repeating' on button %s\n", bh->name);
 			GUI_ASSERT(0);
@@ -469,34 +504,34 @@ void calculate_window_position(uint8_t mode, ...)
 	}
 }
 
-void window_set_title(const char * text)
+void window_set_title(const char *text)
 {
-	window_t * win = get_win(get_parent_window());
+	window_t *win = get_win(get_parent_window());
 	strncpy(win->title, text, NAME_ARRAY_SIZE - 1);
 }
 
 void window_set_title_align(align_t align)
 {
-	window_t * win = get_win(get_parent_window());
+	window_t *win = get_win(get_parent_window());
 	win->title_align = align;
 }
 
-void draw_window(window_t * win)
+void draw_window(window_t *win)
 {
     uint16_t x = win->x1;
     uint16_t y = win->y1;
     if (win->window_id == WINDOW_MAIN) return;
-    GUI_ASSERT(win->w > 0 || win->h > 0);
+    GUI_ASSERT(win->w > 0 && win->h > 0);
 
-    __gui_draw_semitransparent_rect(x, strcmp(win->title, "") ? (y + gui_sizes.window_title_height) : y,
-    x + win->w - 1, y + win->h - 1, GUI_COLOR_DARKGRAY, DEFAULT_ALPHA);
+    uint16_t ys = strcmp(win->title, "") ? (gui_sizes.window_title_height) : 0;
+    __gui_draw_semitransparent_rect(x, y + ys, win->w - 1, win->h - 1 - ys, GUI_COLOR_DARKGRAY, DEFAULT_ALPHA);
 
     // вывод заголовка окна
-    if (strcmp(win->title, ""))
+    if (ys)
     {
         uint16_t title_lenght = 0;
         int tw = 0, th = 0;
-        gui_sdl2_get_text_size(win->title, gui_sdl2_get_window_title_font(), &tw, &th);
+        gui_get_text_sizes(win->title, gui_get_window_title_font(), &tw, &th);
         title_lenght = (uint16_t)tw;
 
         uint16_t xt = 0;
@@ -518,7 +553,7 @@ void draw_window(window_t * win)
         }
 
         __gui_draw_rect(x, y, win->w, gui_sizes.window_title_height, GUI_WINDOWTITLECOLOR, 1);
-        gui_sdl2_draw_text(win->title, xt, y + 5, gui_sdl2_get_window_title_font(), GUI_COLOR_BLACK);
+        gui_draw_text(win->title, xt, y + 5, gui_get_window_title_font(), GUI_COLOR_BLACK);
     }
 }
 

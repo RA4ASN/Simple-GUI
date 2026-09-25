@@ -1,23 +1,23 @@
 // Simple GUI от RA4ASN
-
 #ifndef _gui_windows_h
 #define _gui_windows_h
 
 #include "gui_user_include.h"
+#if SIMPLE_GUI
 #include "gui_structs.h"
 
-window_t * get_win(uint8_t window_id);
-void move_window(window_t * win, int_fast16_t ax, int_fast16_t ay);
+window_t *get_win(uint8_t window_id);
+void move_window(window_t *win, int_fast16_t ax, int_fast16_t ay);
 void window_set_title_align(align_t align);
-void window_set_title(const char * text);
+void window_set_title(const char *text);
 void enable_window_move(void);
 void close_window(uint8_t parent);
-void open_window(window_t * win);
+void open_window(window_t *win);
 void close_all_windows(void);
 void calculate_window_position(uint8_t mode, ...);
 uint8_t is_win_init(void);
 uint8_t is_winmain_init(void);
-void draw_window(window_t * win);
+void draw_window(window_t *win);
 
 typedef enum {
     #define X(window_id, parent_id, align_mode, title, is_close, onVisibleProcess) WINDOW_##window_id,
@@ -28,4 +28,5 @@ typedef enum {
     WINDOWS_COUNT
 } window_index_t;
 
+#endif /* SIMPLE_GUI */
 #endif /* GUI_WINDOWS_H */

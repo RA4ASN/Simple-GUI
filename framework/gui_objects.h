@@ -1,48 +1,50 @@
 // Simple GUI от RA4ASN
-
 #ifndef _gui_objects_h
 #define _gui_objects_h
 
 #include "gui_user_include.h"
-#include "gui_structs.h"
+#if SIMPLE_GUI
+
+#include "gui_includes.h"
 
 uint8_t get_commonbtn_w(void);
 uint8_t get_commonbtn_h(void);
 
-uint16_t get_label_width(const label_t * const lh);
-uint16_t get_label_height(const label_t * const lh);
-uint16_t get_label_height2(const char * name);
-uint16_t get_label_width2(const char * name);
-void draw_label(label_t * lh);
+uint16_t get_label_width(const label_t *const lh);
+uint16_t get_label_height(const label_t *const lh);
+uint16_t get_label_height2(const char *name);
+uint16_t get_label_width2(const char *name);
+void draw_label(label_t *lh);
 
-void textfield_update_size(text_field_t * tf);
-void textfield_add_string(const char * name, const char * str, gui_color_t color);
-void textfield_add_string_old(text_field_t * tf, const char * str, gui_color_t color);
-void textfield_clean(const char * name);
-void draw_textfield(text_field_t * tf);
+void textfield_update_size(text_field_t *tf);
+void textfield_add_string(const char *name, const char *str, gui_color_t color);
+void textfield_add_string_old(text_field_t *tf, const char *str, gui_color_t color);
+void textfield_clean(const char *name);
+void draw_textfield(text_field_t *tf);
 
-void draw_button(button_t * bh);
-void draw_close_button(button_t * bh);
+void draw_button(button_t *bh);
+void draw_close_button(button_t *bh);
 
-void draw_slider(slider_t * sl);
+void draw_slider(slider_t *sl);
 
-void draw_switch(switch_t * sw);
-void switch_set_payload(switch_t * sw, int new_payload, uint8_t animate);
+void draw_switch(switch_t *sw);
+void switch_set_payload(switch_t *sw, int new_payload, uint8_t animate);
 
-void draw_canvas(canvas_t * ca);
-void gui_canvas_set_active(const char * name);
-void gui_canvas_print(const char * text, int x, int y, TTF_Font * font, gui_color_t color);
+void draw_canvas(canvas_t *ca);
+void gui_canvas_set_active(const char *name);
+void gui_canvas_print(const char *text, int x, int y, gui_font_t *font, gui_color_t color);
 
 void gui_objects_init(void);
-uint8_t gui_obj_create(const char * obj_name, ...);
-void gui_obj_align_to(const char * name1, const char * name2, object_alignment_t align, uint16_t offset);
-void gui_obj_set_prop(const char * name, object_prop_t prop, ...);
-int gui_obj_get_int_prop(const char * name, object_prop_t prop);
-char * gui_obj_get_string_prop(const char * name, object_prop_t prop);
-uint8_t gui_check_obj(const char * name1, const char * name2);
+uint8_t gui_obj_create(const char *obj_name, ...);
+void gui_obj_align_to(const char *name1, const char *name2, object_alignment_t align, uint16_t offset);
+void gui_obj_set_prop(const char *name, object_prop_t prop, ...);
+int gui_obj_get_int_prop(const char *name, object_prop_t prop);
+char *gui_obj_get_string_prop(const char *name, object_prop_t prop);
+uint8_t gui_check_obj(const char *name1, const char *name2);
 void gui_arrange_objects(const char names[][NAME_ARRAY_SIZE], uint8_t count, uint8_t cols, uint8_t interval);
-void gui_arrange_objects_from(const char * name, uint8_t count, uint8_t cols, uint8_t interval);
-char * get_obj_name_by_idx(obj_type_t type, uint8_t idx);
-void gui_obj_align_to_arrange_area(const char * name, object_alignment_t align, uint16_t offset);
+void gui_arrange_objects_from(const char *name, uint8_t count, uint8_t cols, uint8_t interval);
+char *get_obj_name_by_idx(obj_type_t type, uint8_t idx);
+void gui_obj_align_to_arrange_area(const char *name, object_alignment_t align, uint16_t offset);
 
+#endif /* SIMPLE_GUI */
 #endif /* _gui_objects_h */

@@ -2,12 +2,8 @@
 #ifndef _gui_structs_h
 #define _gui_structs_h
 
-#include "gui_user_include.h"
-#include "gui_system.h"
 #include "gui_settings.h"
-#include "gui_sdl2_api.h"
-#include "gui_animation.h"
-#include <SDL2/SDL_ttf.h>
+#if SIMPLE_GUI
 
 #define IS_BUTTON_PRESS			(type == TYPE_BUTTON && action == PRESSED)
 #define IS_BUTTON_LONG_PRESS	(type == TYPE_BUTTON && action == LONG_PRESSED)
@@ -21,7 +17,7 @@
 #define GET_FROM_WM_QUEUE(W)	uint8_t type;	\
 								int32_t action;	\
 								char name[NAME_ARRAY_SIZE];		\
-								switch (get_from_wm_queue(W, & type, & action, name))
+								switch (get_from_wm_queue(W, &type, &action, name))
 
 typedef enum {
 	TYPE_DUMMY,
@@ -158,6 +154,46 @@ typedef struct {
 	gui_color_t color_line;
 } tf_entry_t;
 
+typedef enum  {
+	ORIENTATION_VERTICAL,
+	ORIENTATION_HORIZONTAL
+} orientation_t;
+
+typedef enum {
+	ALIGN_LEFT_X,					// вертикальное выравнивание по центру левой половины экрана
+	ALIGN_CENTER_X,					// вертикальное выравнивание по центру экрана
+	ALIGN_RIGHT_X,					// вертикальное выравнивание по центру правой половины экрана
+	ALIGN_MANUAL,					// ручное указание координат
+} window_align_t;
+
+enum {
+	WIN_GUI_COUNT = 2,		 		// на экране не более 2х окон, одно из которых - основное на весь экран
+	WM_MAX_QUEUE_SIZE = 20			// размер очереди сообщений WM
+};
+
+typedef enum {
+	WM_NO_MESSAGE,
+	WM_MESSAGE_UPDATE,				// запрос на обновление состояния элементов GUI в зависимости от состояния базовой системы
+	WM_MESSAGE_ACTION,				// необходима реакция на действия с элементами
+	WM_MESSAGE_ENC2_ROTATE,			// необходима обработка результата вращения 2-го энкодера
+	WM_MESSAGE_KEYB_CODE,			// необходима обработка переданного кода аппаратной кнопки
+	WM_MESSAGE_CLOSE				// выполнение операций после закрытия окна
+} wm_message_t;
+
+typedef enum {
+	CODE_CURSOR_LEFT,
+	CODE_CURSOR_RIGHT,
+	CODE_KEY_ENTER,
+	CODE_KEY_ESCAPE,
+} gui_event_code;
+
+typedef enum {
+	EVENT_TYPE_CONTROL,
+	EVENT_TYPE_KEY,
+} gui_event_type;
+
+// *********************************************************************************
+
 typedef struct {
 	uint16_t w_sim;		// ширина строки в символах
 	uint16_t h_str;		// число строк
@@ -167,12 +203,12 @@ typedef struct {
 	tf_direction_t direction;
 	char name[NAME_ARRAY_SIZE];
 	uint8_t index;
-	tf_entry_t * string;
+	tf_entry_t *string;
 	uint16_t x1;
 	uint16_t y1;
 	uint16_t w;
 	uint16_t h;
-	TTF_Font* font;
+	gui_font_t *font;
 } text_field_t;
 
 typedef struct {
@@ -213,7 +249,7 @@ typedef struct {
 	uint16_t cap_y;
 	uint16_t pill_x;				// смещение тела внутри полного габарита
 	uint16_t pill_y;
-	TTF_Font * font;				// шрифт подписи
+	gui_font_t *font;				// шрифт подписи
 	gui_anim_t anim;				// анимация смены состояния (value: 0..100 - позиция ползунка и заливка)
 } switch_t;
 
@@ -233,7 +269,7 @@ typedef struct {
 	uint8_t index;
 	uint16_t x1;					// координаты от начала окна
 	uint16_t y1;
-	TTF_Font* font;
+	gui_font_t *font;
 	uint16_t line1_w;				// ширина первой строки в пикселях (кэш)
 	uint16_t line2_w;				// ширина второй строки (0, если одна строка)
 	uint8_t sep_pos;				// позиция разделителя '|' в text (0, если нет)
@@ -258,8 +294,8 @@ typedef struct {
 	uint16_t y;
 	uint8_t font_size;
 	uint8_t font_owned;  		// 1 — шрифт открыт меткой и должен быть закрыт при уничтожении
-	TTF_Font* font;
-	uint16_t baseline;      	// расстояние от верха bbox до baseline (= TTF_FontAscent)
+	gui_font_t *font;
+	uint16_t baseline;      	// расстояние от верха bbox до baseline
 } label_t;
 
 typedef struct {
@@ -276,11 +312,6 @@ typedef struct {
 	uint16_t w;
 	uint16_t h;
 } canvas_t;
-
-typedef enum  {
-	ORIENTATION_VERTICAL,
-	ORIENTATION_HORIZONTAL
-} orientation_t;
 
 typedef struct {
 	orientation_t orientation;
@@ -307,27 +338,6 @@ typedef struct {
 	uint16_t scale_size;
 } slider_t;
 
-typedef enum {
-	ALIGN_LEFT_X,					// вертикальное выравнивание по центру левой половины экрана
-	ALIGN_CENTER_X,					// вертикальное выравнивание по центру экрана
-	ALIGN_RIGHT_X,					// вертикальное выравнивание по центру правой половины экрана
-	ALIGN_MANUAL,					// ручное указание координат
-} window_align_t;
-
-enum {
-	WIN_GUI_COUNT = 2,		 		// на экране не более 2х окон, одно из которых - основное на весь экран
-	WM_MAX_QUEUE_SIZE = 20			// размер очереди сообщений WM
-};
-
-typedef enum {
-	WM_NO_MESSAGE,
-	WM_MESSAGE_UPDATE,				// запрос на обновление состояния элементов GUI в зависимости от состояния базовой системы
-	WM_MESSAGE_ACTION,				// необходима реакция на действия с элементами
-	WM_MESSAGE_ENC2_ROTATE,			// необходима обработка результата вращения 2-го энкодера
-	WM_MESSAGE_KEYB_CODE,			// необходима обработка переданного кода аппаратной кнопки
-	WM_MESSAGE_CLOSE				// выполнение операций после закрытия окна
-} wm_message_t;
-
 typedef struct {
 	wm_message_t message;			// тип сообщения
 	obj_type_t type;				// тип элемента
@@ -349,21 +359,21 @@ typedef struct {
 	uint8_t is_close;				// разрешение или запрет вывода кнопки закрытия окна
 	void (*onVisibleProcess) (void);
 	//	*** служебные и автоматически заполняемые элементы структуры ***
-	button_t * bh_ptr;				// указатели на массивы оконных элементов
+	button_t *bh_ptr;				// указатели на массивы оконных элементов
 	uint8_t bh_count;
-	label_t * lh_ptr;
+	label_t *lh_ptr;
 	uint8_t lh_count;
-	slider_t * sh_ptr;
+	slider_t *sh_ptr;
 	uint8_t sh_count;
-	touch_area_t * ta_ptr;
+	touch_area_t *ta_ptr;
 	uint8_t ta_count;
-	text_field_t * tf_ptr;
+	text_field_t *tf_ptr;
 	uint8_t tf_count;
-	switch_t * sw_ptr;				// массив переключателей окна
+	switch_t *sw_ptr;				// массив переключателей окна
 	uint8_t sw_count;
-	canvas_t * ca_ptr;
+	canvas_t *ca_ptr;
 	uint8_t ca_count;
-	canvas_t * ca_current;			// выбранный canvas для отрисовки
+	canvas_t *ca_current;			// выбранный canvas для отрисовки
 	button_t close_button;			// системная кнопка закрытия окна (встроена в окно, без глобального состояния)
 	wm_queue_t queue;
 	uint8_t first_call;				// признак первого вызова для различных инициализаций
@@ -398,16 +408,5 @@ typedef struct {
 	uint8_t current_drawing_window;
 } gui_t;
 
-typedef enum {
-	CODE_CURSOR_LEFT,
-	CODE_CURSOR_RIGHT,
-	CODE_KEY_ENTER,
-	CODE_KEY_ESCAPE,
-} gui_event_code;
-
-typedef enum {
-	EVENT_TYPE_CONTROL,
-	EVENT_TYPE_KEY,
-} gui_event_type;
-
+#endif /* SIMPLE_GUI */
 #endif /* _gui_structs_h */
