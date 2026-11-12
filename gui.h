@@ -1,7 +1,7 @@
 #ifndef _gui_h
 #define _gui_h
 
-#include "gui_user_include.h"
+//#include "gui_user_include.h"
 
 #ifdef __cplusplus
 extern "C" {

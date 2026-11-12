@@ -83,6 +83,12 @@ static void free_win_ptr (window_t *win)
 		}
 	}
 
+	if (win->ca_count)
+	{
+		for (uint8_t i = 0; i < win->ca_count; i++)
+			__gui_free_raw_image(&win->ca_ptr[i].raw_tex);
+	}
+
 	clean_wm_queue(win);
 
 	free(win->bh_ptr);
@@ -108,6 +114,7 @@ static void free_win_ptr (window_t *win)
 	win->tf_ptr = NULL;
 	win->ca_ptr = NULL;
 	win->sw_ptr = NULL;
+
 //	GUI_DEBUG_PRINT("free: %d %s\n", win->window_id, win->title);
 }
 
@@ -161,7 +168,7 @@ void enable_window_move(void)
 	win->is_moving = 1;
 }
 
-void move_window(window_t *win, int_fast16_t ax, int_fast16_t ay)
+void move_window(window_t *win, int16_t ax, int16_t ay)
 {
 	GUI_ASSERT(win != NULL);
 

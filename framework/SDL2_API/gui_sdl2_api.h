@@ -56,6 +56,14 @@ void __gui_draw_line(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, gui_col
 void __gui_draw_point(uint16_t x, uint16_t y, gui_color_t color);
 void __gui_draw_semitransparent_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, gui_color_t color, uint16_t alpha);
 
+/* Raw-изображение на canvas.
+   pixels — буфер w*h пикселей формата 0xAARRGGBB (gui_color_t), строки без выравнивания;
+   tex    — адрес служебного дескриптора текстуры, принадлежащего canvas:
+            backend создаёт её при первом вызове и пересоздаёт при смене w/h. */
+void __gui_draw_raw_image(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const void *pixels, void **tex);
+/* Освободить текстуру raw-изображения и обнулить дескриптор */
+void __gui_free_raw_image(void **tex);
+
 uint8_t __gui_get_touch_event(uint16_t *x, uint16_t *y);
 uint32_t __gui_get_ticks(void);
 

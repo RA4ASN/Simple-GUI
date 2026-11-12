@@ -275,14 +275,15 @@ void draw_close_button(button_t *bh)
 void draw_canvas(canvas_t *ca)
 {
 	window_t *win = get_win(ca->parent);
-
 	uint16_t x = win->draw_x1 + ca->x;
 	uint16_t y = win->draw_y1 + ca->y;
 	uint8_t alpha = (ca->color >> 24) & 0xFF;
 
 	if (ca->background)
-		__gui_draw_semitransparent_rect(x, y, ca->w - 1, ca->h - 1,
-				ca->color, alpha);
+		__gui_draw_semitransparent_rect(x, y, ca->w - 1, ca->h - 1, ca->color, alpha);
+
+	if (ca->raw_image)
+		__gui_draw_raw_image(x, y, ca->w, ca->h, ca->raw_image, &ca->raw_tex);
 
 	if (ca->border)
 		__gui_draw_rect(x, y, ca->w, ca->h, GUI_COLOR_GRAY, 0);
@@ -570,6 +571,7 @@ uint8_t gui_obj_create(const char *name, ...)
 		win->sw_count ++;
 		break;
 	}
+
 	case TYPE_CANVAS:
 	{
 		canvas_t *ca_tmp = (canvas_t *) realloc(win->ca_ptr, sizeof(canvas_t) * (win->ca_count + 1));
@@ -590,6 +592,8 @@ uint8_t gui_obj_create(const char *name, ...)
 		ca->state = CANCELLED;
 		ca->x = 0;
 		ca->y = 0;
+		ca->raw_image = NULL;
+		ca->raw_tex = NULL;
 		strncpy(ca->name, obj_name, NAME_ARRAY_SIZE);
 
 		idx = win->ca_count;
@@ -909,6 +913,7 @@ int gui_obj_get_int_prop(const char *name, object_prop_t prop)
 		else if (prop == GUI_OBJ_STATE) return ca->state;
 		else if (prop == GUI_OBJ_BORDER) return ca->border;
 		else if (prop == GUI_OBJ_INDEX) return ca->index;
+		else if (prop == GUI_OBJ_PAYLOAD) return ca->raw_image != NULL;	// 0/1 — привязано ли raw-изображение
 		break;
 	}
 
@@ -1001,6 +1006,26 @@ int gui_obj_get_int_prop(const char *name, object_prop_t prop)
 // GUI_OBJ_WIDTH:            int w                       (ширина ТЕЛА; полный габарит пересчитывается)
 // GUI_OBJ_HEIGHT:           int h                       (высота ТЕЛА; полный габарит пересчитывается)
 // GUI_OBJ_SIZE:             int w, int h                (размеры ТЕЛА; полный габарит пересчитывается)
+//
+// ===================== TYPE_CANVAS (ca_) =====================
+// GUI_OBJ_VISIBLE:          int visible                 (0/1)
+// GUI_OBJ_POS_X:            int x                       (относительно draw_x1/draw_y1 окна)
+// GUI_OBJ_POS_Y:            int y
+// GUI_OBJ_POS:              int x, int y
+// GUI_OBJ_COLOR:            gui_color_t color           (фон, альфа в старшем байте)
+// GUI_OBJ_WIDTH:            int w
+// GUI_OBJ_HEIGHT:           int h
+// GUI_OBJ_SIZE:             int w, int h
+// GUI_OBJ_STATE:            int state
+// GUI_OBJ_BORDER:           int border                  (0/1)
+// GUI_OBJ_BACK:             int background              (0/1)
+// GUI_OBJ_PAYLOAD:          void *raw_image             (УКАЗАТЕЛЬ, не int!)
+//                           Буфер пикселей формата gui_color_t (0xAARRGGBB),
+//                           размером w*h, строки без выравнивания.
+//                           (void *) NULL — отключить изображение.
+//                           Буфер должен оставаться валидным всё время использования;
+//                           содержимое перечитывается каждый кадр.
+//                           При смене w/h буфер должен соответствовать новому размеру.
 void gui_obj_set_prop(const char *name, object_prop_t prop, ...)
 {
 	window_t *win = get_win(get_parent_window());
@@ -1212,6 +1237,13 @@ void gui_obj_set_prop(const char *name, object_prop_t prop, ...)
 		else if (prop == GUI_OBJ_STATE) ca->state = va_arg(arg, int);
 		else if (prop == GUI_OBJ_BORDER) ca->border = !! va_arg(arg, int);
 		else if (prop == GUI_OBJ_BACK) ca->background = !! va_arg(arg, int);
+		else if (prop == GUI_OBJ_PAYLOAD) {
+			// Указатель на raw-буфер пикселей 0xAARRGGBB размером w*h.
+			// NULL — отключить изображение и освободить текстуру.
+			const void *img = va_arg(arg, void *);
+			if (img == NULL) __gui_free_raw_image(&ca->raw_tex);
+			ca->raw_image = img;
+		}
 		break;
 	}
 	default:

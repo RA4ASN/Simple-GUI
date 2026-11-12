@@ -3,6 +3,7 @@
 #if SIMPLE_GUI && ! GUI_USE_PORT
 #include "../gui_includes.h"
 #include "gui_sdl2_api.h"
+#include <string.h>
 
 /* Кэш последнего установленного цвета, режима блендинга и рендерера.
    Позволяет избежать повторных вызовов SDL_SetRenderDrawColor/BlendMode
@@ -227,6 +228,71 @@ uint8_t __gui_get_touch_event(uint16_t * x, uint16_t * y) {
 uint32_t __gui_get_ticks(void)
 {
     return SDL_GetTicks();
+}
+
+/* Отрисовка raw-изображения через потоковую текстуру.
+   Каждый кадр содержимое пользовательского буфера копируется в текстуру
+   связкой SDL_LockTexture / SDL_UnlockTexture и выводится SDL_RenderCopy. */
+void __gui_draw_raw_image(uint16_t x, uint16_t y, uint16_t w, uint16_t h, const void *pixels, void **tex)
+{
+	if (pixels == NULL || tex == NULL || w == 0 || h == 0) return;
+	SDL_Renderer *renderer = sdl2_get_renderer();
+	if (renderer == NULL) return;
+
+	SDL_Texture *t = (SDL_Texture *) *tex;
+
+	/* Пересоздание текстуры при изменении размеров canvas */
+	if (t != NULL)
+	{
+		int tw = 0, th = 0;
+		SDL_QueryTexture(t, NULL, NULL, &tw, &th);
+		if (tw != (int) w || th != (int) h)
+		{
+			SDL_DestroyTexture(t);
+			t = NULL;
+		}
+	}
+	if (t == NULL)
+	{
+		t = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888,
+				SDL_TEXTUREACCESS_STREAMING, (int) w, (int) h);
+		if (t == NULL)
+		{
+			*tex = NULL;
+			return;
+		}
+		SDL_SetTextureBlendMode(t, SDL_BLENDMODE_BLEND);	// учитываем альфу пикселей
+		*tex = t;
+	}
+
+	/* Копирование буфера в текстуру с учётом pitch (может быть больше w*4) */
+	void *dst_pixels = NULL;
+	int pitch = 0;
+	if (SDL_LockTexture(t, NULL, &dst_pixels, &pitch) == 0)
+	{
+		const uint8_t *src = (const uint8_t *) pixels;
+		uint8_t *dst = (uint8_t *) dst_pixels;
+		const size_t row_bytes = (size_t) w * 4;
+		for (int row = 0; row < (int) h; row++)
+		{
+			memcpy(dst, src, row_bytes);
+			dst += pitch;
+			src += row_bytes;
+		}
+		SDL_UnlockTexture(t);
+	}
+
+	const SDL_Rect dstrect = { .x = x, .y = y, .w = w, .h = h };
+	SDL_RenderCopy(renderer, t, NULL, &dstrect);
+}
+
+void __gui_free_raw_image(void **tex)
+{
+	if (tex != NULL && *tex != NULL)
+	{
+		SDL_DestroyTexture((SDL_Texture *) *tex);
+		*tex = NULL;
+	}
 }
 
 #endif /* SIMPLE_GUI && ! GUI_USE_PORT */

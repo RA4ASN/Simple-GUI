@@ -118,7 +118,7 @@ uint8_t put_to_wm_queue(window_t *win, wm_message_t message, ...)
 				win->queue.data[win->queue.size].action = action;
 				strncpy(win->queue.data[win->queue.size].name, name,
 						NAME_ARRAY_SIZE - 1);
-				win->queue.data[win->queue.size].name[NAME_ARRAY_SIZE - 1] = '\0'; // явный терминатор (1.3)
+				win->queue.data[win->queue.size].name[NAME_ARRAY_SIZE - 1] = '\0';
 				win->queue.size++;
 			}
 			return 1;
@@ -207,11 +207,11 @@ wm_message_t get_from_wm_queue(uint8_t win_id, uint8_t *type, int32_t *action, c
 	if (win->queue.data[win->queue.size].message == WM_MESSAGE_ACTION) {
 		char obj_name[NAME_ARRAY_SIZE] = { 0 };
 		strncpy(obj_name, win->queue.data[win->queue.size].name, NAME_ARRAY_SIZE - 1);
-		obj_name[NAME_ARRAY_SIZE - 1] = '\0';          				// явный терминатор (1.3)
+		obj_name[NAME_ARRAY_SIZE - 1] = '\0';
 		char *r = strrchr(obj_name, '#');
-		if (r) obj_name[r - obj_name] = '\0';              			// guard от NULL (1.1)
+		if (r) obj_name[r - obj_name] = '\0';
 		strncpy(name, obj_name, NAME_ARRAY_SIZE - 1);
-		name[NAME_ARRAY_SIZE - 1] = '\0';              				// явный терминатор (1.3)
+		name[NAME_ARRAY_SIZE - 1] = '\0';
 	}
 
 	wm_message_t m = win->queue.data[win->queue.size].message;

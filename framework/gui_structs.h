@@ -311,6 +311,9 @@ typedef struct {
 	uint16_t y;
 	uint16_t w;
 	uint16_t h;
+	const void *raw_image;		/* raw-буфер пикселей 0xAARRGGBB (w*h шт.), NULL — изображения нет;
+								   буфер принадлежит пользователю, содержимое перечитывается каждый кадр */
+	void *raw_tex;				/* служебный дескриптор потоковой текстуры backend'а (не трогать) */
 } canvas_t;
 
 typedef struct {
